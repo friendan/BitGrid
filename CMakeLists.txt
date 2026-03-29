@@ -15,7 +15,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_definitions(-DUNICODE -D_UNICODE)
 
 # 包含ezui头文件目录
-include_directories(ezui/include)
+include_directories(ezui/include/EzUI)
 
 # 收集ezui源文件
 file(GLOB EZUI_SOURCES "ezui/sources/*.cpp")

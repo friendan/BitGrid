@@ -1,45 +1,45 @@
-#include <EzUI/EzUI.h>
+#include <Application.h>
+#include <Window.h>
+#include <Label.h>
+#include <Button.h>
+#include <TextBox.h>
+#include <CheckBox.h>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     // 创建应用程序实例
-    EzUI::Application app;
+    ezui::Application app;
     
     // 创建主窗口
-    auto window = EzUI::Window::Create(L"BitGrid", 800, 600);
-    window->SetBackgroundColor(EzUI::Color::White);
+    ezui::Window window(800, 600);
+    window.SetText(L"BitGrid");
     
     // 创建标题标签
-    auto titleLabel = EzUI::Label::Create(L"Welcome to BitGrid");
-    titleLabel->SetPosition(300, 50);
-    titleLabel->SetSize(200, 30);
-    titleLabel->SetFontSize(18);
-    window->AddChild(titleLabel);
+    ezui::Label titleLabel(&window);
+    titleLabel.SetText(L"Welcome to BitGrid");
+    titleLabel.SetLocation(ezui::Point(300, 50));
+    titleLabel.SetSize(ezui::Size(200, 30));
     
     // 创建按钮
-    auto button = EzUI::Button::Create(L"Click Me");
-    button->SetPosition(300, 150);
-    button->SetSize(200, 50);
-    button->OnClick([](EzUI::Control* sender) {
-        EzUI::MessageBox::Show(L"Hello, BitGrid!");
-    });
-    window->AddChild(button);
+    ezui::Button button(&window);
+    button.SetText(L"Click Me");
+    button.SetLocation(ezui::Point(300, 150));
+    button.SetSize(ezui::Size(200, 50));
     
     // 创建文本框
-    auto textBox = EzUI::TextBox::Create();
-    textBox->SetPosition(300, 250);
-    textBox->SetSize(200, 30);
-    window->AddChild(textBox);
+    ezui::TextBox textBox(&window);
+    textBox.SetLocation(ezui::Point(300, 250));
+    textBox.SetSize(ezui::Size(200, 30));
     
     // 创建复选框
-    auto checkBox = EzUI::CheckBox::Create(L"Enable Feature");
-    checkBox->SetPosition(300, 300);
-    checkBox->SetSize(150, 20);
-    window->AddChild(checkBox);
+    ezui::CheckBox checkBox(&window);
+    checkBox.SetText(L"Enable Feature");
+    checkBox.SetLocation(ezui::Point(300, 300));
+    checkBox.SetSize(ezui::Size(150, 20));
     
     // 显示窗口
-    window->Show();
+    window.Show();
     
     // 运行应用程序
-    return app.Run();
+    return app.Exec();
 }

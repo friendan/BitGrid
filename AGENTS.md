@@ -106,10 +106,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 - Windows SDK
 
 ### 构建步骤
-1. 创建构建目录：`mkdir build && cd build`
-2. 运行 CMake：`cmake ..`
-3. 打开生成的解决方案：`BitGrid.sln`
-4. 编译并运行项目
+1. 生成VS2020解决方案命令：cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Debug
+2. 编译工程命令：cmake --build build --config Debug
 
 ## 注意事项
 - 确保使用 C++17 或更高版本
