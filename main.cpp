@@ -130,10 +130,23 @@ public:
     
     void AddLog(const std::wstring& message) {
         if (logList) {
+            // 获取当前时间
+            time_t now = time(0);
+            tm ltm;
+            localtime_s(&ltm, &now);
+            wchar_t timeStr[32];
+            swprintf_s(timeStr, L"%04d-%02d-%02d %02d:%02d:%02d", 
+                ltm.tm_year + 1900, ltm.tm_mon + 1, ltm.tm_mday,
+                ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
+            
+            // 组合时间戳和消息
+            std::wstring fullMessage = std::wstring(timeStr) + L" " + message;
+            
             Label* logItem = new Label();
-            logItem->SetText(message);
+            logItem->SetText(fullMessage);
             logItem->SetFixedHeight(20);
             logItem->Style.FontSize = 12;
+            logItem->TextAlign = TextAlign::TopLeft;  // 左对齐
             logList->Add(logItem);
             logList->Invalidate();
         }
