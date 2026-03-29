@@ -113,3 +113,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 - 确保使用 C++17 或更高版本
 - 链接必要的系统库（user32, gdi32, comctl32 等）
 - 运行时需要 Direct2D 支持
+
+### demo目录说明
+1. 这是使用ezui库编写程序的例子代码，可以参考，从而掌握如何使用ezui库

@@ -41,3 +41,4 @@
 *.dwo
 build
 demo
+/bin/Debug/*.exp
