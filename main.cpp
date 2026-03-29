@@ -9,10 +9,38 @@
 #include <CheckBox.h>
 #include <VListView.h>
 #include <UIManager.h>
-#include <Resource.h>
 #include "resource.h"
+#include <fstream>
+#include <ctime>
 
 using namespace ezui;
+
+// 日志文件
+std::wofstream g_logFile;
+
+void InitLog() {
+    g_logFile.open("debug.log", std::ios::out | std::ios::trunc);
+    g_logFile << L"=== BitGrid Debug Log Started ===" << std::endl;
+}
+
+void Log(const std::wstring& msg) {
+    if (g_logFile.is_open()) {
+        time_t now = time(0);
+        tm ltm;
+        localtime_s(&ltm, &now);
+        wchar_t timeStr[32];
+        swprintf_s(timeStr, L"[%02d:%02d:%02d] ", ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
+        g_logFile << timeStr << msg << std::endl;
+        g_logFile.flush();
+    }
+}
+
+void CloseLog() {
+    if (g_logFile.is_open()) {
+        g_logFile << L"=== Log Ended ===" << std::endl;
+        g_logFile.close();
+    }
+}
 
 class MainFrm : public Window {
 private:
@@ -24,39 +52,80 @@ private:
     
 public:
     MainFrm(int width, int height) : Window(width, height) {
+        Log(L"MainFrm constructor started");
         Init();
+        Log(L"MainFrm constructor completed");
     }
     
     void Init() {
+        Log(L"Init() started");
         this->SetText(L"BitGrid - 日志查看器");
+        Log(L"Window title set");
         
         // 从RC资源加载布局
-        HRSRC hRsrc = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_MAIN_LAYOUT), L"HTML");
+        std::wstring xmlContent;
+        Log(L"Trying RC resource...");
+        
+        HRSRC hRsrc = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_MAIN_LAYOUT), RT_HTML);
+        Log(L"FindResourceW RT_HTML result: " + std::to_wstring((ULONG_PTR)hRsrc));
+        
+        if (!hRsrc) {
+            hRsrc = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_MAIN_LAYOUT), L"HTML");
+            Log(L"FindResourceW L\"HTML\" result: " + std::to_wstring((ULONG_PTR)hRsrc));
+        }
+        
         if (hRsrc) {
             HGLOBAL hGlobal = LoadResource(NULL, hRsrc);
+            Log(L"LoadResource result: " + std::to_wstring((ULONG_PTR)hGlobal));
             if (hGlobal) {
                 DWORD size = SizeofResource(NULL, hRsrc);
-                const wchar_t* xmlData = (const wchar_t*)LockResource(hGlobal);
+                Log(L"Resource size: " + std::to_wstring(size));
+                const char* xmlData = (const char*)LockResource(hGlobal);
                 if (xmlData && size > 0) {
-                    // 注意：资源数据可能需要BOM处理，这里假设是UTF-16
-                    ui.LoadXmlData(xmlData);
+                    Log(L"Resource locked, converting to wide string");
+                    int wideLen = MultiByteToWideChar(CP_UTF8, 0, xmlData, size, NULL, 0);
+                    Log(L"Wide char length: " + std::to_wstring(wideLen));
+                    if (wideLen > 0) {
+                        xmlContent.resize(wideLen);
+                        MultiByteToWideChar(CP_UTF8, 0, xmlData, size, &xmlContent[0], wideLen);
+                        Log(L"Loaded from RC resource successfully");
+                    }
                 }
             }
         }
         
-        ui.SetupUI(this);
+        Log(L"XML content size: " + std::to_wstring(xmlContent.size()));
+        if (!xmlContent.empty()) {
+            Log(L"Calling LoadXmlData...");
+            ui.LoadXmlData(xmlContent.c_str());
+            Log(L"LoadXmlData completed");
+        }
+        else {
+            Log(L"ERROR: XML content is empty!");
+        }
         
-        // 获取控件引用
+        Log(L"Calling SetupUI...");
+        ui.SetupUI(this);
+        Log(L"SetupUI completed");
+        
+        Log(L"Getting control references...");
         logList = (VListView*)this->FindControl("logList");
         statusLeft = (Label*)this->FindControl("statusLeft");
         statusCenter = (Label*)this->FindControl("statusCenter");
         statusRight = (Label*)this->FindControl("statusRight");
         
-        // 添加启动日志
+        Log(L"logList: " + std::to_wstring((ULONG_PTR)logList));
+        Log(L"statusLeft: " + std::to_wstring((ULONG_PTR)statusLeft));
+        Log(L"statusCenter: " + std::to_wstring((ULONG_PTR)statusCenter));
+        Log(L"statusRight: " + std::to_wstring((ULONG_PTR)statusRight));
+        
+        Log(L"Adding startup log...");
         AddLog(L"ready...");
         
-        // 更新状态栏
+        Log(L"Updating status bar...");
         UpdateStatus(L"就绪", L"", L"2024-01-01 12:00:00");
+        
+        Log(L"Init() completed");
     }
     
     void AddLog(const std::wstring& message) {
@@ -117,6 +186,9 @@ public:
 
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
+    InitLog();
+    Log(L"=== Program Started ===");
+    
     Application app;
     app.EnableHighDpi();
     
@@ -124,5 +196,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
     frm.CenterToScreen();
     frm.Show();
     
-    return app.Exec();
+    int result = app.Exec();
+    CloseLog();
+    return result;
 }

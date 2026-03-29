@@ -42,3 +42,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     dwrite
     windowscodecs
 )
+
+# 确保资源文件依赖关系
+set_property(SOURCE BitGrid.rc PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/main.htm)
