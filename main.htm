@@ -1,0 +1,102 @@
+<vbox id="main">
+  <!-- 顶部功能按钮区域 -->
+  <hbox id="toolbar" height="50" margin="5,5,5,0">
+    <spacer width="10"></spacer>
+    <button class="btn" id="btnStart" width="80" text="开始"></button>
+    <spacer width="10"></spacer>
+    <button class="btn" id="btnStop" width="80" text="停止"></button>
+    <spacer width="10"></spacer>
+    <button class="btn" id="btnClear" width="80" text="清空日志"></button>
+    <spacer width="10"></spacer>
+    <button class="btn" id="btnSave" width="80" text="保存日志"></button>
+    <spacer></spacer>
+    <button class="btn" id="btnSettings" width="80" text="设置"></button>
+    <spacer width="10"></spacer>
+    <button class="btn" id="btnAbout" width="80" text="关于"></button>
+    <spacer width="10"></spacer>
+  </hbox>
+  
+  <!-- 中间日志输出区域 -->
+  <vbox id="logContainer" margin="5">
+    <vlistview id="logList" scrollbar="logScrollbar">
+    </vlistview>
+  </vbox>
+  
+  <!-- 底部状态栏（3栏） -->
+  <hbox id="statusbar" height="30" margin="5,0,5,5">
+    <label id="statusLeft" width="200" halign="left" text="就绪"></label>
+    <spacer></spacer>
+    <label id="statusCenter" width="200" halign="center" text=""></label>
+    <spacer></spacer>
+    <label id="statusRight" width="200" halign="right" text=""></label>
+  </hbox>
+</vbox>
+
+<style>
+  /* 主窗口样式 */
+  #main {
+    background-color: #F5F5F5;
+  }
+  
+  /* 工具栏样式 */
+  #toolbar {
+    background-color: #FFFFFF;
+    border: 1px #D0D0D0 solid;
+    border-radius: 5px;
+  }
+  
+  /* 按钮样式 */
+  .btn {
+    border-radius: 3px;
+    border: 1px #C0C0C0 solid;
+    background-color: #F0F0F0;
+    font-size: 13px;
+    color: #333333;
+  }
+  .btn:hover {
+    border-color: #0078D4;
+    background-color: #E5F1FB;
+  }
+  .btn:active {
+    background-color: #CCE4F7;
+  }
+  
+  /* 日志容器样式 */
+  #logContainer {
+    background-color: #FFFFFF;
+    border: 1px #D0D0D0 solid;
+    border-radius: 5px;
+  }
+  
+  /* 日志列表样式 */
+  #logList {
+    background-color: #FFFFFF;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+  }
+  
+  /* 状态栏样式 */
+  #statusbar {
+    background-color: #E8E8E8;
+    border: 1px #D0D0D0 solid;
+    border-radius: 3px;
+  }
+  
+  #statusLeft, #statusCenter, #statusRight {
+    font-size: 12px;
+    color: #333333;
+  }
+  
+  /* 滚动条样式 */
+  #logScrollbar {
+    border-radius: 3px;
+    background-color: rgba(200, 200, 200, 0.3);
+    fore-color: rgba(150, 150, 150, 0.8);
+  }
+  #logScrollbar:hover {
+    fore-color: rgba(100, 100, 100, 0.9);
+  }
+  #logScrollbar:active {
+    fore-color: rgba(80, 80, 80, 1.0);
+  }
+</style>

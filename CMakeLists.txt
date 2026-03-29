@@ -24,8 +24,11 @@ include_directories(ezui/include/EzUI)
 # 收集ezui源文件
 file(GLOB EZUI_SOURCES "ezui/sources/*.cpp")
 
+# 添加资源文件
+set(RESOURCE_FILES BitGrid.rc)
+
 # 添加main.cpp作为主入口文件
-add_executable(${PROJECT_NAME} WIN32 main.cpp ${EZUI_SOURCES})
+add_executable(${PROJECT_NAME} WIN32 main.cpp ${EZUI_SOURCES} ${RESOURCE_FILES})
 
 # 链接必要的系统库
 target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -39,4 +42,3 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     dwrite
     windowscodecs
 )
-
