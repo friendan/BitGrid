@@ -57,5 +57,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     windowscodecs
 )
 
+# 忽略特定链接器警告
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    LINK_FLAGS "/ignore:4286 /ignore:4217"
+)
+
 # 确保资源文件依赖关系
 set_property(SOURCE BitGrid.rc PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/main.htm)

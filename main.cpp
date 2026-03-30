@@ -10,6 +10,8 @@
 #include <VListView.h>
 #include <UIManager.h>
 #include "resource.h"
+#include "DrawGrid.hpp"
+#include "AppUtil.hpp"
 #include <fstream>
 #include <ctime>
 
@@ -125,6 +127,9 @@ public:
         Log(L"Updating status bar...");
         UpdateStatus(L"就绪", L"", L"2024-01-01 12:00:00");
         
+        // 测试图片还原功能
+        TestRestoreFromImage();
+        
         Log(L"Init() completed");
     }
     
@@ -157,6 +162,37 @@ public:
             logList->Clear(true);
             logList->Invalidate();
         }
+    }
+    
+    // 测试图片还原功能
+    void TestRestoreFromImage() {
+        AddLog(L"[TEST] 开始测试图片还原功能...");
+        
+        // 测试图片路径（请根据实际情况修改）
+        std::wstring imagePath = L"1.png";
+        
+        // 调用还原函数
+        std::string hexData = DrawGrid::RestoreFromImage(imagePath);
+        
+        if (hexData.empty()) {
+            AddLog(L"[TEST] 还原失败：未能从图片中提取数据");
+            AddLog(L"[TEST] 请确保图片文件存在：1.png");
+        } else {
+            // 将结果转换为宽字符串显示
+            std::wstring wHexData = AppUtil::StrToWStr(hexData);
+            
+            AddLog(L"[TEST] 还原成功！");
+            AddLog(L"[TEST] 数据长度：" + std::to_wstring(hexData.length()) + L" 字符");
+            
+            // 显示前100个字符
+            if (wHexData.length() > 100) {
+                AddLog(L"[TEST] 数据内容（前100字符）：" + wHexData.substr(0, 100) + L"...");
+            } else {
+                AddLog(L"[TEST] 数据内容：" + wHexData);
+            }
+        }
+        
+        AddLog(L"[TEST] 测试完成");
     }
     
     void UpdateStatus(const std::wstring& left, const std::wstring& center, const std::wstring& right) {
@@ -202,6 +238,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
     InitLog();
     Log(L"=== Program Started ===");
     
+    // 初始化GDI+
+    DrawGrid::Inst()->InitGdiPlus();
+    Log(L"GDI+ initialized");
+    
     Application app;
     app.EnableHighDpi();
     
@@ -210,6 +250,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
     frm.Show();
     
     int result = app.Exec();
+    
+    // 卸载GDI+
+    DrawGrid::Inst()->UninitGdiPlus();
+    Log(L"GDI+ shutdown");
+    
     CloseLog();
     return result;
 }
