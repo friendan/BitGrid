@@ -221,15 +221,6 @@ static uint8_t ColorToBit(uint32_t color)
 }
 
 //=============================================================================
-// 辅助函数：将4个bit转换为十六进制字符
-//=============================================================================
-static char BitsToHexChar(uint8_t bits[4])
-{
-    int value = (bits[0] << 3) | (bits[1] << 2) | (bits[2] << 1) | bits[3];
-    return AppConst::BinTohex[value];
-}
-
-//=============================================================================
 // 从单张图片还原十六进制字符串
 //=============================================================================
 std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
@@ -282,7 +273,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
             bits[bitIndex++] = bit;
             
             if (bitIndex >= 4) {
-                result += BitsToHexChar(bits);
+                result += AppUtil::BitsToHexChar(bits);
                 bitIndex = 0;
             }
         }
