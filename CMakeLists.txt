@@ -34,8 +34,15 @@ set(PROJECT_SOURCES
     DrawGrid.cpp
 )
 
+# 添加项目头文件（让IDE能正确显示）
+set(PROJECT_HEADERS
+    AppUtil.hpp
+    DrawGrid.hpp
+    AppConst.hpp
+)
+
 # 添加main.cpp作为主入口文件
-add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES} ${EZUI_SOURCES} ${RESOURCE_FILES})
+add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${EZUI_SOURCES} ${RESOURCE_FILES})
 
 # 链接必要的系统库
 target_link_libraries(${PROJECT_NAME} PRIVATE
