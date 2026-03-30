@@ -287,6 +287,11 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     int height = bitmap->GetHeight();
     const int lineCount = AppConst::BORDER_LINE_COUNT;
     
+    AppUtil::SaveLog("[FindBorder] Start, image size: ", std::to_string(width), " x ", std::to_string(height));
+    AppUtil::SaveLog("[FindBorder] BORDER_LINE_COUNT: ", std::to_string(lineCount));
+    AppUtil::SaveLog("[FindBorder] BORDER_COLOR: ", std::to_string(AppConst::BORDER_COLOR));
+    AppUtil::SaveLog("[FindBorder] COLOR_THRESHOLD: ", std::to_string(AppConst::COLOR_THRESHOLD));
+    
     // 从左边缘查找连续的BORDER_LINE_COUNT条垂直边框线
     left = -1;
     for (int x = 0; x <= width - lineCount; x++) {
@@ -352,12 +357,17 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     }
     
     // 验证是否找到所有边框
+    AppUtil::SaveLog("[FindBorder] left=", std::to_string(left), " right=", std::to_string(right), 
+                     " top=", std::to_string(top), " bottom=", std::to_string(bottom));
+    
     if (left < 0 || right < 0 || top < 0 || bottom < 0) {
+        AppUtil::SaveLog("[FindBorder] Failed: some border not found");
         return false;
     }
     
     // 验证能组成有效矩形：left < right 且 top < bottom
     if (left >= right || top >= bottom) {
+        AppUtil::SaveLog("[FindBorder] Failed: invalid rectangle");
         return false;
     }
     
@@ -365,6 +375,7 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     int borderWidth = right - left + 1;
     int expectedMinWidth = lineCount * 2 + 2;  // 至少要有左右边框+偏移
     if (borderWidth < expectedMinWidth) {
+        AppUtil::SaveLog("[FindBorder] Failed: borderWidth too small: ", std::to_string(borderWidth));
         return false;
     }
     
@@ -372,9 +383,11 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     int borderHeight = bottom - top + 1;
     int expectedMinHeight = lineCount * 2 + 2;  // 至少要有上下边框+偏移
     if (borderHeight < expectedMinHeight) {
+        AppUtil::SaveLog("[FindBorder] Failed: borderHeight too small: ", std::to_string(borderHeight));
         return false;
     }
     
+    AppUtil::SaveLog("[FindBorder] Success");
     return true;
 }
 
@@ -385,22 +398,42 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
 {
     std::string result;
     
+    AppUtil::SaveLog("[RestoreFromImage] Start");
+    AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
+    
     // 加载图片
     Gdiplus::Bitmap* bitmap = Gdiplus::Bitmap::FromFile(imagePath.c_str());
     if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
-        if (bitmap) delete bitmap;
+        AppUtil::SaveLog("[RestoreFromImage] Failed to load image");
+        if (bitmap) {
+            AppUtil::SaveLog("[RestoreFromImage] Bitmap status: ", std::to_string(bitmap->GetLastStatus()));
+            delete bitmap;
+        }
         return result;
     }
     
+    int width = bitmap->GetWidth();
+    int height = bitmap->GetHeight();
+    AppUtil::SaveLog("[RestoreFromImage] Image size: ", std::to_string(width), " x ", std::to_string(height));
+    
     // 查找边框位置
     int left, top, right, bottom;
+    AppUtil::SaveLog("[RestoreFromImage] Finding border...");
     if (!FindBorder(bitmap, left, top, right, bottom)) {
+        AppUtil::SaveLog("[RestoreFromImage] FindBorder failed");
         delete bitmap;
         return result;
     }
     
+    AppUtil::SaveLog("[RestoreFromImage] Border found: left=", std::to_string(left), 
+                     " top=", std::to_string(top), 
+                     " right=", std::to_string(right), 
+                     " bottom=", std::to_string(bottom));
+    
     const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
     const static int& lineCount = AppConst::BORDER_LINE_COUNT;
+    
+    AppUtil::SaveLog("[RestoreFromImage] lineOffset=", std::to_string(lineOffset), " lineCount=", std::to_string(lineCount));
     
     // 计算真实绘制区域（去掉边框）
     int xStart = left + lineOffset + lineCount;
@@ -408,10 +441,18 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
     int xEnd = right - lineOffset - lineCount + 1;
     int yEnd = bottom - lineOffset - lineCount + 1;
     
+    AppUtil::SaveLog("[RestoreFromImage] Draw area: xStart=", std::to_string(xStart), 
+                     " yStart=", std::to_string(yStart), 
+                     " xEnd=", std::to_string(xEnd), 
+                     " yEnd=", std::to_string(yEnd));
+    
     int drawWidth = xEnd - xStart;
     int drawHeight = yEnd - yStart;
     
+    AppUtil::SaveLog("[RestoreFromImage] Draw size: ", std::to_string(drawWidth), " x ", std::to_string(drawHeight));
+    
     if (drawWidth <= 0 || drawHeight <= 0) {
+        AppUtil::SaveLog("[RestoreFromImage] Invalid draw size");
         delete bitmap;
         return result;
     }
@@ -419,6 +460,11 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
     // 读取像素并还原为十六进制字符串
     uint8_t bits[4] = {0};
     int bitIndex = 0;
+    int validPixelCount = 0;
+    int invalidPixelCount = 0;
+    int totalPixels = 0;
+    
+    AppUtil::SaveLog("[RestoreFromImage] Starting pixel processing...");
     
     for (int y = yStart; y < yEnd; y++) {
         for (int x = xStart; x < xEnd; x++) {
@@ -428,11 +474,15 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
             uint32_t colorValue = 0xFF000000 | (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
             uint8_t bit = ColorToBit(colorValue);
             
+            totalPixels++;
+            
             // 跳过无效颜色（背景色）
             if (bit == 255) {
+                invalidPixelCount++;
                 continue;
             }
             
+            validPixelCount++;
             bits[bitIndex++] = bit;
             
             if (bitIndex >= 4) {
@@ -442,7 +492,15 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
         }
     }
     
+    AppUtil::SaveLog("[RestoreFromImage] Pixel processing done");
+    AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
+    AppUtil::SaveLog("[RestoreFromImage] Valid pixels: ", std::to_string(validPixelCount));
+    AppUtil::SaveLog("[RestoreFromImage] Invalid pixels: ", std::to_string(invalidPixelCount));
+    AppUtil::SaveLog("[RestoreFromImage] Result length: ", std::to_string(result.length()));
+    AppUtil::SaveLog("[RestoreFromImage] Remaining bits: ", std::to_string(bitIndex));
+    
     delete bitmap;
+    AppUtil::SaveLog("[RestoreFromImage] End");
     return result;
 }
 
