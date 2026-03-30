@@ -134,6 +134,9 @@ public:
     }
     
     void AddLog(const std::wstring& message) {
+        // 同时写入日志文件
+        Log(message);
+        
         if (logList) {
             // 获取当前时间
             time_t now = time(0);
@@ -171,8 +174,10 @@ public:
         // 测试图片路径（请根据实际情况修改）
         std::wstring imagePath = L"1.png";
         
-        // 调用还原函数
-        std::string hexData = DrawGrid::RestoreFromImage(imagePath);
+        // 调用还原函数，同时获取文件名和文件内容
+        std::string fileName;
+        std::string fileContentHex;
+        std::string hexData = DrawGrid::RestoreFromImage(imagePath, &fileName, &fileContentHex);
         
         if (hexData.empty()) {
             AddLog(L"[TEST] 还原失败：未能从图片中提取数据");
@@ -180,10 +185,24 @@ public:
         } else {
             // 将结果转换为宽字符串显示
             std::wstring wHexData = AppUtil::StrToWStr(hexData);
+            std::wstring wFileName = AppUtil::StrToWStr(fileName);
+            std::wstring wFileContentHex = AppUtil::StrToWStr(fileContentHex);
             
             AddLog(L"[TEST] 还原成功！");
-            AddLog(L"[TEST] 数据长度：" + std::to_wstring(hexData.length()) + L" 字符");
-            AddLog(L"[TEST] 数据内容：" + wHexData);
+            AddLog(L"[TEST] ========== 还原结果 ==========");
+            AddLog(L"[TEST] 原始文件名：" + wFileName);
+            AddLog(L"[TEST] 文件名长度：" + std::to_wstring(fileName.length()) + L" 字节");
+            AddLog(L"[TEST] 文件内容长度：" + std::to_wstring(fileContentHex.length()) + L" 字符(十六进制)");
+            if (!fileContentHex.empty()) {
+                // 只显示前100个字符，避免日志过长
+                std::wstring preview = wFileContentHex.substr(0, min(wFileContentHex.length(), 100));
+                AddLog(L"[TEST] 文件内容预览：" + preview);
+                if (wFileContentHex.length() > 100) {
+                    AddLog(L"[TEST] ... (共 " + std::to_wstring(fileContentHex.length()) + L" 字符，已截断)");
+                }
+            }
+            AddLog(L"[TEST] 完整数据长度：" + std::to_wstring(hexData.length()) + L" 字符");
+            AddLog(L"[TEST] ================================");
         }
         
         AddLog(L"[TEST] 测试完成");

@@ -419,9 +419,15 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
 //=============================================================================
 // 从单张图片还原十六进制字符串
 //=============================================================================
-std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
+std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath, 
+                                        std::string* outFileName,
+                                        std::string* outFileContentHex)
 {
     std::string result;
+    
+    // 清空输出参数
+    if (outFileName) outFileName->clear();
+    if (outFileContentHex) outFileContentHex->clear();
     
     AppUtil::SaveLog("[RestoreFromImage] Start");
     AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
@@ -532,6 +538,68 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
     
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
+    
+    // 解析还原的数据结构
+    // 格式：[文件名(256字节)的十六进制] + [.end的十六进制] + [文件内容的十六进制]
+    if (!result.empty()) {
+        AppUtil::SaveLog("[RestoreFromImage] Parsing data structure...");
+        
+        // .end 的十六进制是 "2E656E64" (8个字符)
+        const std::string endMarker = "2E656E64";
+        size_t endPos = result.find(endMarker);
+        
+        std::string fileName;
+        std::string fileContentHex;
+        
+        if (endPos != std::string::npos && endPos == 256 * 2) {  // 文件名正好是256字节 = 512个十六进制字符
+            // 提取文件名（前512个字符是256字节文件名的十六进制）
+            std::string fileNameHex = result.substr(0, 512);
+            fileName = AppUtil::HexStrToStr(fileNameHex);
+            
+            // 去掉末尾的填充'0'字符（不是null字符）
+            size_t realNameEnd = fileName.find_last_not_of('0');
+            if (realNameEnd != std::string::npos) {
+                fileName = fileName.substr(0, realNameEnd + 1);
+            }
+            
+            // 提取文件内容（.end之后）
+            fileContentHex = result.substr(endPos + endMarker.length());
+            
+            AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
+            AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
+        } else {
+            AppUtil::SaveLog("[RestoreFromImage] Data structure parse failed. endPos=", std::to_string(endPos));
+            
+            // 即使找不到.end标记，也尝试提取文件名
+            if (result.length() >= 512) {
+                std::string fileNameHex = result.substr(0, 512);
+                fileName = AppUtil::HexStrToStr(fileNameHex);
+                
+                // 去掉末尾的填充'0'字符（不是null字符）
+                size_t realNameEnd = fileName.find_last_not_of('0');
+                if (realNameEnd != std::string::npos) {
+                    fileName = fileName.substr(0, realNameEnd + 1);
+                }
+                
+                // 尝试从512字符后提取文件内容
+                if (result.length() > 512) {
+                    fileContentHex = result.substr(512);
+                }
+                
+                AppUtil::SaveLog("[RestoreFromImage] Extracted file name (fallback): ", fileName);
+                AppUtil::SaveLog("[RestoreFromImage] Extracted content length (fallback): ", std::to_string(fileContentHex.length()));
+            }
+        }
+        
+        // 通过输出参数返回解析结果
+        if (outFileName) {
+            *outFileName = fileName;
+        }
+        if (outFileContentHex) {
+            *outFileContentHex = fileContentHex;
+        }
+    }
+    
     return result;
 }
 
@@ -593,17 +661,50 @@ static std::vector<FileInfo> GetImageFilesSorted(const std::wstring& folderPath)
 //=============================================================================
 // 从文件夹还原十六进制字符串（多页情况）
 //=============================================================================
-std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath)
+std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
+                                         std::string* outFileName,
+                                         std::string* outFileContentHex)
 {
     std::string result;
+    
+    // 清空输出参数
+    if (outFileName) outFileName->clear();
+    if (outFileContentHex) outFileContentHex->clear();
     
     // 获取所有图片文件并按创建时间排序
     std::vector<FileInfo> files = GetImageFilesSorted(folderPath);
     
+    AppUtil::SaveLog("[RestoreFromFolder] Found ", std::to_string(files.size()), " image files");
+    
     // 依次处理每个文件
-    for (const auto& file : files) {
-        std::string pageData = RestoreFromImage(file.path);
+    std::string allFileContentHex;
+    for (size_t i = 0; i < files.size(); i++) {
+        AppUtil::SaveLog("[RestoreFromFolder] Processing file ", std::to_string(i + 1), "/", std::to_string(files.size()), ": ", AppUtil::WStrToStr(files[i].path));
+        
+        std::string pageFileName;
+        std::string pageFileContentHex;
+        std::string pageData = RestoreFromImage(files[i].path, &pageFileName, &pageFileContentHex);
+        
         result += pageData;
+        allFileContentHex += pageFileContentHex;
+        
+        // 第一页包含文件名信息
+        if (i == 0 && outFileName && !pageFileName.empty()) {
+            *outFileName = pageFileName;
+        }
+    }
+    
+    // 返回合并后的文件内容
+    if (outFileContentHex) {
+        *outFileContentHex = allFileContentHex;
+    }
+    
+    AppUtil::SaveLog("[RestoreFromFolder] Total result length: ", std::to_string(result.length()));
+    if (outFileName && !outFileName->empty()) {
+        AppUtil::SaveLog("[RestoreFromFolder] File name: ", *outFileName);
+    }
+    if (outFileContentHex) {
+        AppUtil::SaveLog("[RestoreFromFolder] File content hex length: ", std::to_string(outFileContentHex->length()));
     }
     
     return result;

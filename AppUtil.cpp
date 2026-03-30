@@ -260,3 +260,29 @@ std::string AppUtil::GetFileDrawHexString(HWND hParent){
     return res;
  }
 
+std::string AppUtil::HexStrToStr(const std::string& hexStr)
+{
+    if (hexStr.empty() || hexStr.length() % 2 != 0) {
+        return "";
+    }
+
+    std::string result;
+    result.reserve(hexStr.length() / 2);
+
+    // 高性能查表转换
+    auto CharToHex = [](char c) -> uint8_t {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
+        if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+        return 0;
+    };
+
+    for (size_t i = 0; i < hexStr.length(); i += 2) {
+        uint8_t high = CharToHex(hexStr[i]);
+        uint8_t low = CharToHex(hexStr[i + 1]);
+        result += static_cast<char>((high << 4) | low);
+    }
+
+    return result;
+}
+

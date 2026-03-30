@@ -102,4 +102,11 @@ public:
 
     static std::string StringToLen256(const std::string& str);
 
+    /**
+     * @brief 将十六进制字符串转换为普通字符串
+     * @param hexStr 十六进制字符串（如："74657374" -> "test"）
+     * @return 转换后的普通字符串
+     */
+    static std::string HexStrToStr(const std::string& hexStr);
+
 };
