@@ -183,13 +183,7 @@ public:
             
             AddLog(L"[TEST] 还原成功！");
             AddLog(L"[TEST] 数据长度：" + std::to_wstring(hexData.length()) + L" 字符");
-            
-            // 显示前100个字符
-            if (wHexData.length() > 100) {
-                AddLog(L"[TEST] 数据内容（前100字符）：" + wHexData.substr(0, 100) + L"...");
-            } else {
-                AddLog(L"[TEST] 数据内容：" + wHexData);
-            }
+            AddLog(L"[TEST] 数据内容：" + wHexData);
         }
         
         AddLog(L"[TEST] 测试完成");

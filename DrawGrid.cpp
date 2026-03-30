@@ -193,18 +193,19 @@ void DrawGrid::DrawHexString(HWND hwnd, HDC hdc){
 static uint8_t ColorToBit(uint32_t color)
 {
     // 去掉Alpha通道，只比较RGB
+    // 注意：Windows使用BGR格式，红色在低字节
     uint32_t rgb = color & 0x00FFFFFF;
     
-    // 提取RGB分量
-    int r1 = (rgb >> 16) & 0xFF;
-    int g1 = (rgb >> 8) & 0xFF;
-    int b1 = rgb & 0xFF;
+    // 提取RGB分量（BGR格式）
+    int r = rgb & 0xFF;              // 红色在低字节
+    int g = (rgb >> 8) & 0xFF;       // 绿色在中间
+    int b = (rgb >> 16) & 0xFF;      // 蓝色在高字节
     
     // 计算与黑色的距离
-    int distBlack = abs(r1 - 0) + abs(g1 - 0) + abs(b1 - 0);
+    int distBlack = r + g + b;
     
     // 计算与白色的距离
-    int distWhite = abs(r1 - 0xFF) + abs(g1 - 0xFF) + abs(b1 - 0xFF);
+    int distWhite = abs(r - 0xFF) + abs(g - 0xFF) + abs(b - 0xFF);
     
     // 如果距离黑色在阈值内，返回0
     if (distBlack <= AppConst::COLOR_THRESHOLD) {
@@ -217,6 +218,17 @@ static uint8_t ColorToBit(uint32_t color)
     }
     
     // 其他情况视为无效颜色
+    // 添加调试：打印前几个无效颜色的信息
+    static int debugCount = 0;
+    if (debugCount < 10) {
+        AppUtil::SaveLog("[ColorToBit] Invalid color: R=", std::to_string(r), 
+                         " G=", std::to_string(g), " B=", std::to_string(b),
+                         " distBlack=", std::to_string(distBlack),
+                         " distWhite=", std::to_string(distWhite),
+                         " threshold=", std::to_string(AppConst::COLOR_THRESHOLD));
+        debugCount++;
+    }
+    
     return 255;
 }
 
@@ -228,13 +240,15 @@ static bool IsBorderColor(uint32_t color)
     uint32_t rgb = color & 0x00FFFFFF;
     uint32_t borderColor = AppConst::BORDER_COLOR;
     
-    int r1 = (rgb >> 16) & 0xFF;
-    int g1 = (rgb >> 8) & 0xFF;
-    int b1 = rgb & 0xFF;
+    // Windows RGB宏是BGR格式: 0x00BBGGRR
+    // 从Gdiplus::Color获取的是ARGB格式: 0xAARRGGBB
+    int r1 = rgb & 0xFF;                    // 红色在低字节
+    int g1 = (rgb >> 8) & 0xFF;             // 绿色在中间
+    int b1 = (rgb >> 16) & 0xFF;            // 蓝色在高字节
     
-    int r2 = (borderColor >> 16) & 0xFF;
+    int r2 = borderColor & 0xFF;            // BORDER_COLOR也是BGR格式
     int g2 = (borderColor >> 8) & 0xFF;
-    int b2 = borderColor & 0xFF;
+    int b2 = (borderColor >> 16) & 0xFF;
     
     int distance = abs(r1 - r2) + abs(g1 - g2) + abs(b1 - b2);
     return distance <= AppConst::COLOR_THRESHOLD;
@@ -249,13 +263,19 @@ static bool IsBorderColumn(Gdiplus::Bitmap* bitmap, int x, int height)
     for (int y = 0; y < height; y++) {
         Gdiplus::Color color;
         bitmap->GetPixel(x, y, &color);
-        uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+        // Gdiplus::Color是ARGB格式，需要转换为BGR格式
+        uint32_t colorValue = color.GetR() | (color.GetG() << 8) | (color.GetB() << 16);
         if (IsBorderColor(colorValue)) {
             borderCount++;
         }
     }
     // 该列大部分是边框色
-    return borderCount > height * 0.5;
+    bool result = borderCount > height * 0.5;
+    if (x % 50 == 0) {  // 每50列打印一次调试信息
+        AppUtil::SaveLog("[IsBorderColumn] x=", std::to_string(x), " borderCount=", std::to_string(borderCount), 
+                         " height=", std::to_string(height), " result=", result ? "true" : "false");
+    }
+    return result;
 }
 
 //=============================================================================
@@ -267,7 +287,8 @@ static bool IsBorderRow(Gdiplus::Bitmap* bitmap, int y, int width)
     for (int x = 0; x < width; x++) {
         Gdiplus::Color color;
         bitmap->GetPixel(x, y, &color);
-        uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+        // Gdiplus::Color是ARGB格式，需要转换为BGR格式
+        uint32_t colorValue = color.GetR() | (color.GetG() << 8) | (color.GetB() << 16);
         if (IsBorderColor(colorValue)) {
             borderCount++;
         }
@@ -294,7 +315,8 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     
     // 从左边缘查找连续的BORDER_LINE_COUNT条垂直边框线
     left = -1;
-    for (int x = 0; x <= width - lineCount; x++) {
+    AppUtil::SaveLog("[FindBorder] Searching left border...");
+    for (int x = 0; x <= width - lineCount && left < 0; x++) {
         bool found = true;
         for (int i = 0; i < lineCount; i++) {
             if (!IsBorderColumn(bitmap, x + i, height)) {
@@ -304,8 +326,11 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
         }
         if (found) {
             left = x;
-            break;
+            AppUtil::SaveLog("[FindBorder] Left border found at x=", std::to_string(x));
         }
+    }
+    if (left < 0) {
+        AppUtil::SaveLog("[FindBorder] Left border not found");
     }
     
     // 从右边缘查找连续的BORDER_LINE_COUNT条垂直边框线
@@ -436,10 +461,11 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
     AppUtil::SaveLog("[RestoreFromImage] lineOffset=", std::to_string(lineOffset), " lineCount=", std::to_string(lineCount));
     
     // 计算真实绘制区域（去掉边框）
-    int xStart = left + lineOffset + lineCount;
-    int yStart = top + lineOffset + lineCount;
-    int xEnd = right - lineOffset - lineCount + 1;
-    int yEnd = bottom - lineOffset - lineCount + 1;
+    // 边框有lineCount条线，数据从边框内侧开始
+    int xStart = left + lineCount;
+    int yStart = top + lineCount;
+    int xEnd = right - lineCount + 1;
+    int yEnd = bottom - lineCount + 1;
     
     AppUtil::SaveLog("[RestoreFromImage] Draw area: xStart=", std::to_string(xStart), 
                      " yStart=", std::to_string(yStart), 
@@ -498,6 +524,11 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
     AppUtil::SaveLog("[RestoreFromImage] Invalid pixels: ", std::to_string(invalidPixelCount));
     AppUtil::SaveLog("[RestoreFromImage] Result length: ", std::to_string(result.length()));
     AppUtil::SaveLog("[RestoreFromImage] Remaining bits: ", std::to_string(bitIndex));
+    
+    // 输出还原结果
+    if (!result.empty()) {
+        AppUtil::SaveLog("[RestoreFromImage] Result: ", result);
+    }
     
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
