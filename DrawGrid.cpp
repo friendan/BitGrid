@@ -185,4 +185,167 @@ void DrawGrid::DrawHexString(HWND hwnd, HDC hdc){
     AppUtil::SaveLog("DrawHexString finish");
 }
 
+//=============================================================================
+// 辅助函数：将颜色转换为bit值
+//=============================================================================
+static uint8_t ColorToBit(uint32_t color)
+{
+    // 去掉Alpha通道，只比较RGB
+    uint32_t rgb = color & 0x00FFFFFF;
+    
+    // 与背景色比较，接近背景色返回0，否则返回1
+    uint32_t bkColor = 0x00000000 | AppConst::BACKGROUND_COLOR;
+    
+    // 计算颜色距离
+    int r1 = (rgb >> 16) & 0xFF;
+    int g1 = (rgb >> 8) & 0xFF;
+    int b1 = rgb & 0xFF;
+    
+    int r2 = (bkColor >> 16) & 0xFF;
+    int g2 = (bkColor >> 8) & 0xFF;
+    int b2 = bkColor & 0xFF;
+    
+    int distance = abs(r1 - r2) + abs(g1 - g2) + abs(b1 - b2);
+    
+    // 距离小于阈值认为是背景色(0)，否则是前景色(1)
+    return (distance < 128) ? 0 : 1;
+}
 
+//=============================================================================
+// 辅助函数：将4个bit转换为十六进制字符
+//=============================================================================
+static char BitsToHexChar(uint8_t bits[4])
+{
+    int value = (bits[0] << 3) | (bits[1] << 2) | (bits[2] << 1) | bits[3];
+    return AppConst::BinTohex[value];
+}
+
+//=============================================================================
+// 从单张图片还原十六进制字符串
+//=============================================================================
+std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
+{
+    std::string result;
+    
+    // 加载图片
+    Gdiplus::Bitmap* bitmap = Gdiplus::Bitmap::FromFile(imagePath.c_str());
+    if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
+        if (bitmap) delete bitmap;
+        return result;
+    }
+    
+    int width = bitmap->GetWidth();
+    int height = bitmap->GetHeight();
+    
+    const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
+    const static int& lineCount = AppConst::BORDER_LINE_COUNT;
+    
+    // 计算实际绘制区域
+    int drawWidth = width - lineOffset * 2 - lineCount * 2 + 1;
+    int drawHeight = height - lineOffset * 2 - lineCount * 2 + 1;
+    
+    if (drawWidth <= 0 || drawHeight <= 0) {
+        delete bitmap;
+        return result;
+    }
+    
+    // 计算起始位置
+    int xStart = lineOffset + lineCount;
+    int yStart = lineOffset + lineCount;
+    
+    // 读取像素并还原为十六进制字符串
+    uint8_t bits[4] = {0};
+    int bitIndex = 0;
+    
+    for (int y = 0; y < drawHeight; y++) {
+        for (int x = 0; x < drawWidth; x++) {
+            Gdiplus::Color color;
+            bitmap->GetPixel(xStart + x, yStart + y, &color);
+            
+            uint32_t colorValue = 0xFF000000 | (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+            bits[bitIndex++] = ColorToBit(colorValue);
+            
+            if (bitIndex >= 4) {
+                result += BitsToHexChar(bits);
+                bitIndex = 0;
+            }
+        }
+    }
+    
+    delete bitmap;
+    return result;
+}
+
+//=============================================================================
+// 辅助函数：获取文件夹中的所有图片文件并按创建时间排序
+//=============================================================================
+#include <vector>
+#include <algorithm>
+
+struct FileInfo {
+    std::wstring path;
+    FILETIME creationTime;
+};
+
+static std::vector<FileInfo> GetImageFilesSorted(const std::wstring& folderPath)
+{
+    std::vector<FileInfo> files;
+    
+    WIN32_FIND_DATAW findData;
+    std::wstring searchPath = folderPath + L"\\*.*";
+    HANDLE hFind = FindFirstFileW(searchPath.c_str(), &findData);
+    
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            // 跳过目录和特殊文件
+            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                continue;
+            }
+            
+            // 检查是否是图片文件
+            std::wstring fileName = findData.cFileName;
+            size_t dotPos = fileName.find_last_of(L'.');
+            if (dotPos == std::wstring::npos) continue;
+            
+            std::wstring ext = fileName.substr(dotPos);
+            // 转换为小写
+            for (auto& c : ext) c = towlower(c);
+            
+            if (ext == L".png" || ext == L".jpg" || ext == L".jpeg" || 
+                ext == L".bmp" || ext == L".gif" || ext == L".tiff") {
+                FileInfo info;
+                info.path = folderPath + L"\\" + fileName;
+                info.creationTime = findData.ftCreationTime;
+                files.push_back(info);
+            }
+        } while (FindNextFileW(hFind, &findData));
+        
+        FindClose(hFind);
+    }
+    
+    // 按创建时间排序（从早到晚）
+    std::sort(files.begin(), files.end(), [](const FileInfo& a, const FileInfo& b) {
+        return CompareFileTime(&a.creationTime, &b.creationTime) < 0;
+    });
+    
+    return files;
+}
+
+//=============================================================================
+// 从文件夹还原十六进制字符串（多页情况）
+//=============================================================================
+std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath)
+{
+    std::string result;
+    
+    // 获取所有图片文件并按创建时间排序
+    std::vector<FileInfo> files = GetImageFilesSorted(folderPath);
+    
+    // 依次处理每个文件
+    for (const auto& file : files) {
+        std::string pageData = RestoreFromImage(file.path);
+        result += pageData;
+    }
+    
+    return result;
+}
