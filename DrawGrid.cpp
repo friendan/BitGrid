@@ -187,28 +187,37 @@ void DrawGrid::DrawHexString(HWND hwnd, HDC hdc){
 
 //=============================================================================
 // 辅助函数：将颜色转换为bit值
+// 返回值：0=黑色, 1=白色, 255=无效颜色(背景色或其他)
+// 阈值：距离黑色或白色小于等于50视为有效，否则无效
 //=============================================================================
 static uint8_t ColorToBit(uint32_t color)
 {
     // 去掉Alpha通道，只比较RGB
     uint32_t rgb = color & 0x00FFFFFF;
     
-    // 与背景色比较，接近背景色返回0，否则返回1
-    uint32_t bkColor = 0x00000000 | AppConst::BACKGROUND_COLOR;
-    
-    // 计算颜色距离
+    // 提取RGB分量
     int r1 = (rgb >> 16) & 0xFF;
     int g1 = (rgb >> 8) & 0xFF;
     int b1 = rgb & 0xFF;
     
-    int r2 = (bkColor >> 16) & 0xFF;
-    int g2 = (bkColor >> 8) & 0xFF;
-    int b2 = bkColor & 0xFF;
+    // 计算与黑色的距离
+    int distBlack = abs(r1 - 0) + abs(g1 - 0) + abs(b1 - 0);
     
-    int distance = abs(r1 - r2) + abs(g1 - g2) + abs(b1 - b2);
+    // 计算与白色的距离
+    int distWhite = abs(r1 - 0xFF) + abs(g1 - 0xFF) + abs(b1 - 0xFF);
     
-    // 距离小于阈值认为是背景色(0)，否则是前景色(1)
-    return (distance < 128) ? 0 : 1;
+    // 如果距离黑色在阈值内，返回0
+    if (distBlack <= AppConst::COLOR_THRESHOLD) {
+        return 0;
+    }
+    
+    // 如果距离白色在阈值内，返回1
+    if (distWhite <= AppConst::COLOR_THRESHOLD) {
+        return 1;
+    }
+    
+    // 其他情况视为无效颜色
+    return 255;
 }
 
 //=============================================================================
@@ -263,7 +272,14 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
             bitmap->GetPixel(xStart + x, yStart + y, &color);
             
             uint32_t colorValue = 0xFF000000 | (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
-            bits[bitIndex++] = ColorToBit(colorValue);
+            uint8_t bit = ColorToBit(colorValue);
+            
+            // 跳过无效颜色（背景色）
+            if (bit == 255) {
+                continue;
+            }
+            
+            bits[bitIndex++] = bit;
             
             if (bitIndex >= 4) {
                 result += BitsToHexChar(bits);
