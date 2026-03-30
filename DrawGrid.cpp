@@ -241,84 +241,141 @@ static bool IsBorderColor(uint32_t color)
 }
 
 //=============================================================================
+// 辅助函数：检查指定列是否为边框列（连续BORDER_LINE_COUNT条边框线）
+//=============================================================================
+static bool IsBorderColumn(Gdiplus::Bitmap* bitmap, int x, int height)
+{
+    int borderCount = 0;
+    for (int y = 0; y < height; y++) {
+        Gdiplus::Color color;
+        bitmap->GetPixel(x, y, &color);
+        uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+        if (IsBorderColor(colorValue)) {
+            borderCount++;
+        }
+    }
+    // 该列大部分是边框色
+    return borderCount > height * 0.5;
+}
+
+//=============================================================================
+// 辅助函数：检查指定行是否为边框行（连续BORDER_LINE_COUNT条边框线）
+//=============================================================================
+static bool IsBorderRow(Gdiplus::Bitmap* bitmap, int y, int width)
+{
+    int borderCount = 0;
+    for (int x = 0; x < width; x++) {
+        Gdiplus::Color color;
+        bitmap->GetPixel(x, y, &color);
+        uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+        if (IsBorderColor(colorValue)) {
+            borderCount++;
+        }
+    }
+    // 该行大部分是边框色
+    return borderCount > width * 0.5;
+}
+
+//=============================================================================
 // 辅助函数：在图片中查找边框位置
 // 返回：true=找到边框, false=未找到
+// 要求：找到连续的BORDER_LINE_COUNT条边框线
 //=============================================================================
 static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right, int& bottom)
 {
     int width = bitmap->GetWidth();
     int height = bitmap->GetHeight();
+    const int lineCount = AppConst::BORDER_LINE_COUNT;
     
-    // 从左边缘查找第一条垂直边框线
+    // 从左边缘查找连续的BORDER_LINE_COUNT条垂直边框线
     left = -1;
-    for (int x = 0; x < width && left < 0; x++) {
-        int borderPixelCount = 0;
-        for (int y = 0; y < height; y++) {
-            Gdiplus::Color color;
-            bitmap->GetPixel(x, y, &color);
-            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
-            if (IsBorderColor(colorValue)) {
-                borderPixelCount++;
+    for (int x = 0; x <= width - lineCount; x++) {
+        bool found = true;
+        for (int i = 0; i < lineCount; i++) {
+            if (!IsBorderColumn(bitmap, x + i, height)) {
+                found = false;
+                break;
             }
         }
-        // 如果该列大部分是边框色，认为是左边框
-        if (borderPixelCount > height * 0.5) {
+        if (found) {
             left = x;
+            break;
         }
     }
     
-    // 从右边缘查找第一条垂直边框线
+    // 从右边缘查找连续的BORDER_LINE_COUNT条垂直边框线
     right = -1;
-    for (int x = width - 1; x >= 0 && right < 0; x--) {
-        int borderPixelCount = 0;
-        for (int y = 0; y < height; y++) {
-            Gdiplus::Color color;
-            bitmap->GetPixel(x, y, &color);
-            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
-            if (IsBorderColor(colorValue)) {
-                borderPixelCount++;
+    for (int x = width - 1; x >= lineCount - 1; x--) {
+        bool found = true;
+        for (int i = 0; i < lineCount; i++) {
+            if (!IsBorderColumn(bitmap, x - i, height)) {
+                found = false;
+                break;
             }
         }
-        if (borderPixelCount > height * 0.5) {
+        if (found) {
             right = x;
+            break;
         }
     }
     
-    // 从上边缘查找第一条水平边框线
+    // 从上边缘查找连续的BORDER_LINE_COUNT条水平边框线
     top = -1;
-    for (int y = 0; y < height && top < 0; y++) {
-        int borderPixelCount = 0;
-        for (int x = 0; x < width; x++) {
-            Gdiplus::Color color;
-            bitmap->GetPixel(x, y, &color);
-            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
-            if (IsBorderColor(colorValue)) {
-                borderPixelCount++;
+    for (int y = 0; y <= height - lineCount; y++) {
+        bool found = true;
+        for (int i = 0; i < lineCount; i++) {
+            if (!IsBorderRow(bitmap, y + i, width)) {
+                found = false;
+                break;
             }
         }
-        if (borderPixelCount > width * 0.5) {
+        if (found) {
             top = y;
+            break;
         }
     }
     
-    // 从下边缘查找第一条水平边框线
+    // 从下边缘查找连续的BORDER_LINE_COUNT条水平边框线
     bottom = -1;
-    for (int y = height - 1; y >= 0 && bottom < 0; y--) {
-        int borderPixelCount = 0;
-        for (int x = 0; x < width; x++) {
-            Gdiplus::Color color;
-            bitmap->GetPixel(x, y, &color);
-            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
-            if (IsBorderColor(colorValue)) {
-                borderPixelCount++;
+    for (int y = height - 1; y >= lineCount - 1; y--) {
+        bool found = true;
+        for (int i = 0; i < lineCount; i++) {
+            if (!IsBorderRow(bitmap, y - i, width)) {
+                found = false;
+                break;
             }
         }
-        if (borderPixelCount > width * 0.5) {
+        if (found) {
             bottom = y;
+            break;
         }
     }
     
-    return (left >= 0 && right >= 0 && top >= 0 && bottom >= 0 && left < right && top < bottom);
+    // 验证是否找到所有边框
+    if (left < 0 || right < 0 || top < 0 || bottom < 0) {
+        return false;
+    }
+    
+    // 验证能组成有效矩形：left < right 且 top < bottom
+    if (left >= right || top >= bottom) {
+        return false;
+    }
+    
+    // 验证边框宽度一致（左右边框间距等于绘制区域宽度 + 2*lineOffset + 2*lineCount）
+    int borderWidth = right - left + 1;
+    int expectedMinWidth = lineCount * 2 + 2;  // 至少要有左右边框+偏移
+    if (borderWidth < expectedMinWidth) {
+        return false;
+    }
+    
+    // 验证边框高度一致
+    int borderHeight = bottom - top + 1;
+    int expectedMinHeight = lineCount * 2 + 2;  // 至少要有上下边框+偏移
+    if (borderHeight < expectedMinHeight) {
+        return false;
+    }
+    
+    return true;
 }
 
 //=============================================================================
