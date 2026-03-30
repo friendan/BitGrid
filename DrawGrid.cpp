@@ -221,6 +221,107 @@ static uint8_t ColorToBit(uint32_t color)
 }
 
 //=============================================================================
+// 辅助函数：判断颜色是否接近边框色
+//=============================================================================
+static bool IsBorderColor(uint32_t color)
+{
+    uint32_t rgb = color & 0x00FFFFFF;
+    uint32_t borderColor = AppConst::BORDER_COLOR;
+    
+    int r1 = (rgb >> 16) & 0xFF;
+    int g1 = (rgb >> 8) & 0xFF;
+    int b1 = rgb & 0xFF;
+    
+    int r2 = (borderColor >> 16) & 0xFF;
+    int g2 = (borderColor >> 8) & 0xFF;
+    int b2 = borderColor & 0xFF;
+    
+    int distance = abs(r1 - r2) + abs(g1 - g2) + abs(b1 - b2);
+    return distance <= AppConst::COLOR_THRESHOLD;
+}
+
+//=============================================================================
+// 辅助函数：在图片中查找边框位置
+// 返回：true=找到边框, false=未找到
+//=============================================================================
+static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right, int& bottom)
+{
+    int width = bitmap->GetWidth();
+    int height = bitmap->GetHeight();
+    
+    // 从左边缘查找第一条垂直边框线
+    left = -1;
+    for (int x = 0; x < width && left < 0; x++) {
+        int borderPixelCount = 0;
+        for (int y = 0; y < height; y++) {
+            Gdiplus::Color color;
+            bitmap->GetPixel(x, y, &color);
+            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+            if (IsBorderColor(colorValue)) {
+                borderPixelCount++;
+            }
+        }
+        // 如果该列大部分是边框色，认为是左边框
+        if (borderPixelCount > height * 0.5) {
+            left = x;
+        }
+    }
+    
+    // 从右边缘查找第一条垂直边框线
+    right = -1;
+    for (int x = width - 1; x >= 0 && right < 0; x--) {
+        int borderPixelCount = 0;
+        for (int y = 0; y < height; y++) {
+            Gdiplus::Color color;
+            bitmap->GetPixel(x, y, &color);
+            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+            if (IsBorderColor(colorValue)) {
+                borderPixelCount++;
+            }
+        }
+        if (borderPixelCount > height * 0.5) {
+            right = x;
+        }
+    }
+    
+    // 从上边缘查找第一条水平边框线
+    top = -1;
+    for (int y = 0; y < height && top < 0; y++) {
+        int borderPixelCount = 0;
+        for (int x = 0; x < width; x++) {
+            Gdiplus::Color color;
+            bitmap->GetPixel(x, y, &color);
+            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+            if (IsBorderColor(colorValue)) {
+                borderPixelCount++;
+            }
+        }
+        if (borderPixelCount > width * 0.5) {
+            top = y;
+        }
+    }
+    
+    // 从下边缘查找第一条水平边框线
+    bottom = -1;
+    for (int y = height - 1; y >= 0 && bottom < 0; y--) {
+        int borderPixelCount = 0;
+        for (int x = 0; x < width; x++) {
+            Gdiplus::Color color;
+            bitmap->GetPixel(x, y, &color);
+            uint32_t colorValue = (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
+            if (IsBorderColor(colorValue)) {
+                borderPixelCount++;
+            }
+        }
+        if (borderPixelCount > width * 0.5) {
+            bottom = y;
+        }
+    }
+    
+    return (left >= 0 && right >= 0 && top >= 0 && bottom >= 0 && left < right && top < bottom);
+}
+
+//=============================================================================
 // 从单张图片还原十六进制字符串
 //=============================================================================
 std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
@@ -234,33 +335,38 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath)
         return result;
     }
     
-    int width = bitmap->GetWidth();
-    int height = bitmap->GetHeight();
+    // 查找边框位置
+    int left, top, right, bottom;
+    if (!FindBorder(bitmap, left, top, right, bottom)) {
+        delete bitmap;
+        return result;
+    }
     
     const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
     const static int& lineCount = AppConst::BORDER_LINE_COUNT;
     
-    // 计算实际绘制区域
-    int drawWidth = width - lineOffset * 2 - lineCount * 2 + 1;
-    int drawHeight = height - lineOffset * 2 - lineCount * 2 + 1;
+    // 计算真实绘制区域（去掉边框）
+    int xStart = left + lineOffset + lineCount;
+    int yStart = top + lineOffset + lineCount;
+    int xEnd = right - lineOffset - lineCount + 1;
+    int yEnd = bottom - lineOffset - lineCount + 1;
+    
+    int drawWidth = xEnd - xStart;
+    int drawHeight = yEnd - yStart;
     
     if (drawWidth <= 0 || drawHeight <= 0) {
         delete bitmap;
         return result;
     }
     
-    // 计算起始位置
-    int xStart = lineOffset + lineCount;
-    int yStart = lineOffset + lineCount;
-    
     // 读取像素并还原为十六进制字符串
     uint8_t bits[4] = {0};
     int bitIndex = 0;
     
-    for (int y = 0; y < drawHeight; y++) {
-        for (int x = 0; x < drawWidth; x++) {
+    for (int y = yStart; y < yEnd; y++) {
+        for (int x = xStart; x < xEnd; x++) {
             Gdiplus::Color color;
-            bitmap->GetPixel(xStart + x, yStart + y, &color);
+            bitmap->GetPixel(x, y, &color);
             
             uint32_t colorValue = 0xFF000000 | (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
             uint8_t bit = ColorToBit(colorValue);
