@@ -27,8 +27,15 @@ file(GLOB EZUI_SOURCES "ezui/sources/*.cpp")
 # 添加资源文件
 set(RESOURCE_FILES BitGrid.rc)
 
+# 添加项目源文件
+set(PROJECT_SOURCES
+    main.cpp
+    AppUtil.cpp
+    DrawGrid.cpp
+)
+
 # 添加main.cpp作为主入口文件
-add_executable(${PROJECT_NAME} WIN32 main.cpp ${EZUI_SOURCES} ${RESOURCE_FILES})
+add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES} ${EZUI_SOURCES} ${RESOURCE_FILES})
 
 # 链接必要的系统库
 target_link_libraries(${PROJECT_NAME} PRIVATE
