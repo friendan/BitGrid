@@ -39,8 +39,8 @@ public:
 
 private:
     // GDI+ 全局变量
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput{};
+    ULONG_PTR gdiplusToken = NULL;
     
     
 };

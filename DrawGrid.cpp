@@ -15,6 +15,7 @@ using namespace Gdiplus;
 //=============================================================================
 void DrawGrid::InitGdiPlus()
 {
+    gdiplusStartupInput = Gdiplus::GdiplusStartupInput();
     GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 }
 
