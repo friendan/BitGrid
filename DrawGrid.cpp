@@ -186,54 +186,6 @@ void DrawGrid::DrawHexString(HWND hwnd, HDC hdc){
 }
 
 //=============================================================================
-// 辅助函数：将颜色转换为bit值
-// 返回值：0=黑色, 1=白色, 255=无效颜色(背景色或其他)
-// 阈值：距离黑色或白色小于等于50视为有效，否则无效
-//=============================================================================
-static uint8_t ColorToBit(uint32_t color)
-{
-    // 去掉Alpha通道，只比较RGB
-    // 注意：Windows使用BGR格式，红色在低字节
-    uint32_t rgb = color & 0x00FFFFFF;
-    
-    // 提取RGB分量（BGR格式）
-    int r = rgb & 0xFF;              // 红色在低字节
-    int g = (rgb >> 8) & 0xFF;       // 绿色在中间
-    int b = (rgb >> 16) & 0xFF;      // 蓝色在高字节
-    
-    // 计算与黑色的距离
-    int distBlack = r + g + b;
-    
-    // 计算与白色的距离
-    int distWhite = abs(r - 0xFF) + abs(g - 0xFF) + abs(b - 0xFF);
-    
-    // 如果距离黑色在阈值内，返回0
-    if (distBlack <= AppConst::COLOR_THRESHOLD) {
-        return 0;
-    }
-    
-    // 如果距离白色在阈值内，返回1
-    if (distWhite <= AppConst::COLOR_THRESHOLD) {
-        return 1;
-    }
-    
-    // 其他情况视为无效颜色
-    // 添加调试：打印前几个无效颜色的信息
-    static int debugCount = 0;
-    if (debugCount < 10) {
-        AppUtil::SaveLog("[ColorToBit] Invalid color: R=", std::to_string(r), 
-                         " G=", std::to_string(g), " B=", std::to_string(b),
-                         " distBlack=", std::to_string(distBlack),
-                         " distWhite=", std::to_string(distWhite),
-                         " threshold=", std::to_string(AppConst::COLOR_THRESHOLD));
-        debugCount++;
-    }
-    
-    return 255;
-}
-
-
-//=============================================================================
 // 辅助函数：检查指定列是否为边框列（连续BORDER_LINE_COUNT条边框线）
 //=============================================================================
 static bool IsBorderColumn(Gdiplus::Bitmap* bitmap, int x, int height)
