@@ -233,15 +233,13 @@ std::string AppUtil::GetFileDrawHexString(HWND hParent){
     std::string fileName = fs::path(filePath).filename().string();
     std::string fileName256 = AppUtil::StringToLen256(fileName);
     std::string fileNameHexStr = AppUtil::StrToHexStr(fileName256);
-    std::string endHexStr = AppUtil::StrToHexStr(".end");
     std::ostringstream oss;
-    oss << fileNameHexStr << endHexStr << fileHexStr;
+    oss << fileNameHexStr << fileHexStr;
 
     // AppUtil::SaveLog("filePath ", filePath);
     AppUtil::SaveLog("fileName ", fileName);
     AppUtil::SaveLog("fileName256 ", fileName256);
     AppUtil::SaveLog("fileNameHexStr ", fileNameHexStr);
-    AppUtil::SaveLog("endHexStr ", endHexStr);
     // AppUtil::SaveLog("fileHexStr ", fileHexStr);
 
     return oss.str();

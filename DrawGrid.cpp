@@ -530,12 +530,8 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     AppUtil::SaveLog("[RestoreFromImage] Invalid pixels: ", std::to_string(invalidPixelCount));
     AppUtil::SaveLog("[RestoreFromImage] Result length: ", std::to_string(result.length()));
     AppUtil::SaveLog("[RestoreFromImage] Remaining bits: ", std::to_string(bitIndex));
-    
-    // 输出还原结果
-    if (!result.empty()) {
-        AppUtil::SaveLog("[RestoreFromImage] Result: ", result);
-    }
-    
+    AppUtil::SaveLog("[RestoreFromImage] Result: ", result);
+        
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
     
