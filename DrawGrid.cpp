@@ -534,66 +534,27 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
-    
-    // 解析还原的数据结构
-    // 格式：[文件名(256字节)的十六进制] + [.end的十六进制] + [文件内容的十六进制]
-    if (!result.empty()) {
-        AppUtil::SaveLog("[RestoreFromImage] Parsing data structure...");
-        
-        // .end 的十六进制是 "2E656E64" (8个字符)
-        const std::string endMarker = "2E656E64";
-        size_t endPos = result.find(endMarker);
-        
-        std::string fileName;
-        std::string fileContentHex;
-        
-        if (endPos != std::string::npos && endPos == 256 * 2) {  // 文件名正好是256字节 = 512个十六进制字符
-            // 提取文件名（前512个字符是256字节文件名的十六进制）
-            std::string fileNameHex = result.substr(0, 512);
-            fileName = AppUtil::HexStrToStr(fileNameHex);
-            
-            // 去掉末尾的填充'0'字符（不是null字符）
-            size_t realNameEnd = fileName.find_last_not_of('0');
-            if (realNameEnd != std::string::npos) {
-                fileName = fileName.substr(0, realNameEnd + 1);
-            }
-            
-            // 提取文件内容（.end之后）
-            fileContentHex = result.substr(endPos + endMarker.length());
-            
-            AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
-            AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
-        } else {
-            AppUtil::SaveLog("[RestoreFromImage] Data structure parse failed. endPos=", std::to_string(endPos));
-            
-            // 即使找不到.end标记，也尝试提取文件名
-            if (result.length() >= 512) {
-                std::string fileNameHex = result.substr(0, 512);
-                fileName = AppUtil::HexStrToStr(fileNameHex);
-                
-                // 去掉末尾的填充'0'字符（不是null字符）
-                size_t realNameEnd = fileName.find_last_not_of('0');
-                if (realNameEnd != std::string::npos) {
-                    fileName = fileName.substr(0, realNameEnd + 1);
-                }
-                
-                // 尝试从512字符后提取文件内容
-                if (result.length() > 512) {
-                    fileContentHex = result.substr(512);
-                }
-                
-                AppUtil::SaveLog("[RestoreFromImage] Extracted file name (fallback): ", fileName);
-                AppUtil::SaveLog("[RestoreFromImage] Extracted content length (fallback): ", std::to_string(fileContentHex.length()));
-            }
-        }
-        
-        // 通过输出参数返回解析结果
-        if (outFileName) {
-            *outFileName = fileName;
-        }
-        if (outFileContentHex) {
-            *outFileContentHex = fileContentHex;
-        }
+
+    // 文件名正好是256字节 = 512个十六进制字符
+    if(result.size() < 512){
+        return "";
+    }
+    std::string fileNameHex = result.substr(0, 512);
+    std::string fileName = AppUtil::HexStrToStr(fileNameHex);
+    size_t realNameEnd = fileName.find_last_not_of('0'); // 找到最后一个不是'0'的字符的下标
+    if (realNameEnd != std::string::npos) {
+        fileName = fileName.substr(0, realNameEnd + 1); // 去掉末尾的填充'0'字符（不是null字符）
+    }
+    std::string fileContentHex = result.substr(512);
+    AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
+    AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
+
+    // 通过输出参数返回解析结果
+    if (outFileName) {
+        *outFileName = fileName;
+    }
+    if (outFileContentHex) {
+        *outFileContentHex = fileContentHex;
     }
     
     return result;
