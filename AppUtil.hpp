@@ -109,4 +109,7 @@ public:
      */
     static std::string HexStrToStr(const std::string& hexStr);
 
+    static bool IsRgbColor(COLORREF rgbColor1, COLORREF rgbColor2);
+    static uint8_t GetRgbColorBit(COLORREF rgbColor);
+
 };

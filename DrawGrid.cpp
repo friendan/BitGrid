@@ -416,6 +416,10 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     return true;
 }
 
+COLORREF DrawGrid::ColorToRGB(const Gdiplus::Color& color){
+    return RGB(color.GetR(), color.GetG(), color.GetB());
+}
+
 //=============================================================================
 // 从单张图片还原十六进制字符串
 //=============================================================================
@@ -492,31 +496,28 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     // 读取像素并还原为十六进制字符串
     uint8_t bits[4] = {0};
     int bitIndex = 0;
-    int validPixelCount = 0;
-    int invalidPixelCount = 0;
     int totalPixels = 0;
-    
     AppUtil::SaveLog("[RestoreFromImage] Starting pixel processing...");
-    
+
     for (int y = yStart; y < yEnd; y++) {
         for (int x = xStart; x < xEnd; x++) {
             Gdiplus::Color color;
             bitmap->GetPixel(x, y, &color);
-            
-            uint32_t colorValue = 0xFF000000 | (color.GetR() << 16) | (color.GetG() << 8) | color.GetB();
-            uint8_t bit = ColorToBit(colorValue);
-            
-            totalPixels++;
-            
-            // 跳过无效颜色（背景色）
+
+            COLORREF rgbColor = ColorToRGB(color);
+            uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
+
+            AppUtil::SaveLog("x ", x
+                , " y ", y
+                , " rgbColor: ", rgbColor&&0xFFFFFFFF
+            );
+
             if (bit == 255) {
-                invalidPixelCount++;
-                continue;
+               break;  // 无效颜色（背景色?）
             }
             
-            validPixelCount++;
+            totalPixels++;
             bits[bitIndex++] = bit;
-            
             if (bitIndex >= 4) {
                 result += AppUtil::BitsToHexChar(bits);
                 bitIndex = 0;
@@ -526,8 +527,6 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     
     AppUtil::SaveLog("[RestoreFromImage] Pixel processing done");
     AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
-    AppUtil::SaveLog("[RestoreFromImage] Valid pixels: ", std::to_string(validPixelCount));
-    AppUtil::SaveLog("[RestoreFromImage] Invalid pixels: ", std::to_string(invalidPixelCount));
     AppUtil::SaveLog("[RestoreFromImage] Result length: ", std::to_string(result.length()));
     AppUtil::SaveLog("[RestoreFromImage] Remaining bits: ", std::to_string(bitIndex));
     AppUtil::SaveLog("[RestoreFromImage] Result: ", result);

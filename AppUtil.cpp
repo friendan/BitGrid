@@ -1,4 +1,5 @@
 #include "AppUtil.hpp"
+#include "AppConst.hpp"
 #include <cuchar>
 #include <stdexcept>
 #include <clocale>
@@ -282,5 +283,33 @@ std::string AppUtil::HexStrToStr(const std::string& hexStr)
     }
 
     return result;
+}
+
+bool AppUtil::IsRgbColor(COLORREF rgbColor1, COLORREF rgbColor2)
+{
+    // 分别取出 R、G、B 分量
+    int r1 = GetRValue(rgbColor1);
+    int g1 = GetGValue(rgbColor1);
+    int b1 = GetBValue(rgbColor1);
+
+    int r2 = GetRValue(rgbColor2);
+    int g2 = GetGValue(rgbColor2);
+    int b2 = GetBValue(rgbColor2);
+
+    // 计算三个通道的差值总和（曼哈顿距离）
+    int dist = abs(r1 - r2) + abs(g1 - g2) + abs(b1 - b2);
+
+    // 在阈值内就认为颜色相同
+    return dist <= AppConst::COLOR_THRESHOLD;
+}
+
+uint8_t AppUtil::GetRgbColorBit(COLORREF rgbColor){
+    if(AppUtil::IsRgbColor(rgbColor, AppConst::COLOR_BLACK)){
+       return 0;
+    }
+    if(AppUtil::IsRgbColor(rgbColor, AppConst::COLOR_WHITE)){
+       return 1;
+    }
+    return 255; // error
 }
 

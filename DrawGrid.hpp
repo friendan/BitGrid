@@ -27,6 +27,8 @@ public:
 	void InitGdiPlus();
 	void UninitGdiPlus();
 
+	static COLORREF ColorToRGB(const Gdiplus::Color& color);
+
 	// 从截图还原十六进制字符串
 	// 单页情况：传入图片路径，返回还原的十六进制字符串
 	// 输出参数：outFileName 返回文件名，outFileContentHex 返回文件内容的十六进制
