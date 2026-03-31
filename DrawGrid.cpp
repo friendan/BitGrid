@@ -250,6 +250,7 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
         if (found) {
             left = x;
             AppUtil::SaveLog("[FindBorder] Left border found at x=", std::to_string(x));
+            break;
         }
     }
     if (left < 0) {
@@ -305,8 +306,11 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     }
     
     // 验证是否找到所有边框
-    AppUtil::SaveLog("[FindBorder] left=", std::to_string(left), " right=", std::to_string(right), 
-                     " top=", std::to_string(top), " bottom=", std::to_string(bottom));
+    AppUtil::SaveLog("[FindBorder] left=", std::to_string(left)
+        , " right=", std::to_string(right)
+        , " top=", std::to_string(top)
+        , " bottom=", std::to_string(bottom)
+    );
     
     if (left < 0 || right < 0 || top < 0 || bottom < 0) {
         AppUtil::SaveLog("[FindBorder] Failed: some border not found");
@@ -430,11 +434,6 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             COLORREF rgbColor = ColorToRGB(color);
             uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
 
-            AppUtil::SaveLog("x ", x
-                , " y ", y
-                , " rgbColor: ", rgbColor&&0xFFFFFFFF
-            );
-
             if (bit == 255) {
                break;  // 无效颜色（背景色?）
             }
@@ -442,6 +441,13 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             totalPixels++;
             bits[bitIndex++] = bit;
             if (bitIndex >= 4) {
+                AppUtil::SaveLog(" x y ", x-4, " ", y
+                    , " bits: "
+                    , bits[0], " "
+                    , bits[1], " "
+                    , bits[2], " "
+                    , bits[3]
+                );
                 result += AppUtil::BitsToHexChar(bits);
                 bitIndex = 0;
             }
