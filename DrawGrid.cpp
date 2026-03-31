@@ -232,27 +232,6 @@ static uint8_t ColorToBit(uint32_t color)
     return 255;
 }
 
-//=============================================================================
-// 辅助函数：判断颜色是否接近边框色
-//=============================================================================
-static bool IsBorderColor(uint32_t color)
-{
-    uint32_t rgb = color & 0x00FFFFFF;
-    uint32_t borderColor = AppConst::BORDER_COLOR;
-    
-    // Windows RGB宏是BGR格式: 0x00BBGGRR
-    // 从Gdiplus::Color获取的是ARGB格式: 0xAARRGGBB
-    int r1 = rgb & 0xFF;                    // 红色在低字节
-    int g1 = (rgb >> 8) & 0xFF;             // 绿色在中间
-    int b1 = (rgb >> 16) & 0xFF;            // 蓝色在高字节
-    
-    int r2 = borderColor & 0xFF;            // BORDER_COLOR也是BGR格式
-    int g2 = (borderColor >> 8) & 0xFF;
-    int b2 = (borderColor >> 16) & 0xFF;
-    
-    int distance = abs(r1 - r2) + abs(g1 - g2) + abs(b1 - b2);
-    return distance <= AppConst::COLOR_THRESHOLD;
-}
 
 //=============================================================================
 // 辅助函数：检查指定列是否为边框列（连续BORDER_LINE_COUNT条边框线）
@@ -263,18 +242,12 @@ static bool IsBorderColumn(Gdiplus::Bitmap* bitmap, int x, int height)
     for (int y = 0; y < height; y++) {
         Gdiplus::Color color;
         bitmap->GetPixel(x, y, &color);
-        // Gdiplus::Color是ARGB格式，需要转换为BGR格式
-        uint32_t colorValue = color.GetR() | (color.GetG() << 8) | (color.GetB() << 16);
-        if (IsBorderColor(colorValue)) {
+        COLORREF rgbColor = DrawGrid::ColorToRGB(color);
+        if (AppUtil::IsRgbColor(rgbColor, AppConst::BORDER_COLOR)) {
             borderCount++;
         }
     }
-    // 该列大部分是边框色
-    bool result = borderCount > height * 0.5;
-    if (x % 50 == 0) {  // 每50列打印一次调试信息
-        AppUtil::SaveLog("[IsBorderColumn] x=", std::to_string(x), " borderCount=", std::to_string(borderCount), 
-                         " height=", std::to_string(height), " result=", result ? "true" : "false");
-    }
+    bool result = borderCount > height * 0.5;  // 该列大部分是边框色
     return result;
 }
 
@@ -287,14 +260,12 @@ static bool IsBorderRow(Gdiplus::Bitmap* bitmap, int y, int width)
     for (int x = 0; x < width; x++) {
         Gdiplus::Color color;
         bitmap->GetPixel(x, y, &color);
-        // Gdiplus::Color是ARGB格式，需要转换为BGR格式
-        uint32_t colorValue = color.GetR() | (color.GetG() << 8) | (color.GetB() << 16);
-        if (IsBorderColor(colorValue)) {
+        COLORREF rgbColor = DrawGrid::ColorToRGB(color);
+        if (AppUtil::IsRgbColor(rgbColor, AppConst::BORDER_COLOR)) {
             borderCount++;
         }
     }
-    // 该行大部分是边框色
-    return borderCount > width * 0.5;
+    return borderCount > width * 0.5;  // 该行大部分是边框色
 }
 
 //=============================================================================
