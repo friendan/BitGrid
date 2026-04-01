@@ -424,9 +424,13 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     uint8_t bits[4] = {0};
     int bitIndex = 0;
     int totalPixels = 0;
+    int errorRow = 0;
     AppUtil::SaveLog("[RestoreFromImage] Starting pixel processing...");
 
     for (int y = yStart; y < yEnd; y++) {
+        if(errorRow >= 2){
+            break; // 连续2行没有 后面肯定是没有了
+        }
         for (int x = xStart; x < xEnd; x++) {
             Gdiplus::Color color;
             bitmap->GetPixel(x, y, &color);
@@ -434,14 +438,17 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             COLORREF rgbColor = ColorToRGB(color);
             uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
 
+            AppUtil::SaveLog("[RestoreFromImage] x y ", x, " ", y);
+
             if (bit == 255) {
-               break;  // 无效颜色（背景色?）
+               errorRow += 1;
+               break;  // 无效颜色（背景色?有时候一行画不满）
             }
             
             totalPixels++;
             bits[bitIndex++] = bit;
             if (bitIndex >= 4) {
-                AppUtil::SaveLog(" x y ", x-4, " ", y
+                AppUtil::SaveLog(" x y ", x-3, " ", y
                     , " bits: "
                     , bits[0], " "
                     , bits[1], " "
