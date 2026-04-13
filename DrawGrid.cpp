@@ -438,7 +438,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             COLORREF rgbColor = ColorToRGB(color);
             uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
 
-            AppUtil::SaveLog("[RestoreFromImage] x y ", x, " ", y);
+            // AppUtil::SaveLog("[RestoreFromImage] x y ", x, " ", y);
 
             if (bit == 255) {
                errorRow += 1;
@@ -448,13 +448,13 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             totalPixels++;
             bits[bitIndex++] = bit;
             if (bitIndex >= 4) {
-                AppUtil::SaveLog(" x y ", x-3, " ", y
-                    , " bits: "
-                    , bits[0], " "
-                    , bits[1], " "
-                    , bits[2], " "
-                    , bits[3]
-                );
+                // AppUtil::SaveLog(" x y ", x-3, " ", y
+                //     , " bits: "
+                //     , bits[0], " "
+                //     , bits[1], " "
+                //     , bits[2], " "
+                //     , bits[3]
+                // );
                 result += AppUtil::BitsToHexChar(bits);
                 bitIndex = 0;
             }
