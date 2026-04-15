@@ -12,6 +12,9 @@
 #include "resource.h"
 #include "DrawGrid.hpp"
 #include "AppUtil.hpp"
+#include "PathUtil.hpp"
+#include "ScreenSelectOverlay.hpp"
+#include "ScreenCapture.hpp"
 #include <fstream>
 #include <ctime>
 
@@ -51,6 +54,9 @@ private:
     Label* statusLeft = nullptr;
     Label* statusCenter = nullptr;
     Label* statusRight = nullptr;
+
+    RECT selectedRectScreen{};
+    bool hasSelection = false;
     
 public:
     MainFrm(int width, int height) : Window(width, height) {
@@ -61,7 +67,7 @@ public:
     
     void Init() {
         Log(L"Init() started");
-        this->SetText(L"BitGrid - 日志查看器");
+        this->SetText(L"BitGrid");
         Log(L"Window title set");
         
         // 从RC资源加载布局
@@ -125,10 +131,7 @@ public:
         AddLog(L"ready...");
         
         Log(L"Updating status bar...");
-        UpdateStatus(L"就绪", L"", L"2024-01-01 12:00:00");
-        
-        // 测试图片还原功能
-        TestRestoreFromImage();
+        UpdateStatus(L"就绪", L"", L"");
         
         Log(L"Init() completed");
     }
@@ -167,47 +170,6 @@ public:
         }
     }
     
-    // 测试图片还原功能
-    void TestRestoreFromImage() {
-        AddLog(L"[TEST] 开始测试图片还原功能...");
-        
-        // 测试图片路径（请根据实际情况修改）
-        std::wstring imagePath = L"1.png";
-        
-        // 调用还原函数，同时获取文件名和文件内容
-        std::string fileName;
-        std::string fileContentHex;
-        std::string hexData = DrawGrid::RestoreFromImage(imagePath, &fileName, &fileContentHex);
-        
-        if (hexData.empty()) {
-            AddLog(L"[TEST] 还原失败：未能从图片中提取数据");
-            AddLog(L"[TEST] 请确保图片文件存在：1.png");
-        } else {
-            // 将结果转换为宽字符串显示
-            std::wstring wHexData = AppUtil::StrToWStr(hexData);
-            std::wstring wFileName = AppUtil::StrToWStr(fileName);
-            std::wstring wFileContentHex = AppUtil::StrToWStr(fileContentHex);
-            
-            AddLog(L"[TEST] 还原成功！");
-            AddLog(L"[TEST] ========== 还原结果 ==========");
-            AddLog(L"[TEST] 原始文件名：" + wFileName);
-            AddLog(L"[TEST] 文件名长度：" + std::to_wstring(fileName.length()) + L" 字节");
-            AddLog(L"[TEST] 文件内容长度：" + std::to_wstring(fileContentHex.length()) + L" 字符(十六进制)");
-            if (!fileContentHex.empty()) {
-                // 只显示前100个字符，避免日志过长
-                std::wstring preview = wFileContentHex.substr(0, min(wFileContentHex.length(), 100));
-                AddLog(L"[TEST] 文件内容预览：" + preview);
-                if (wFileContentHex.length() > 100) {
-                    AddLog(L"[TEST] ... (共 " + std::to_wstring(fileContentHex.length()) + L" 字符，已截断)");
-                }
-            }
-            AddLog(L"[TEST] 完整数据长度：" + std::to_wstring(hexData.length()) + L" 字符");
-            AddLog(L"[TEST] ================================");
-        }
-        
-        AddLog(L"[TEST] 测试完成");
-    }
-    
     void UpdateStatus(const std::wstring& left, const std::wstring& center, const std::wstring& right) {
         if (statusLeft) statusLeft->SetText(left);
         if (statusCenter) statusCenter->SetText(center);
@@ -216,26 +178,79 @@ public:
     
     virtual bool OnNotify(Control* sender, EventArgs& args) override {
         if (args.EventType == Event::OnMouseDown) {
-            if (sender->Name == "btnStart") {
-                AddLog(L"[INFO] 开始执行任务...");
-                UpdateStatus(L"运行中", L"处理中...", L"");
+            if (sender->Name == "btnSelect") {
+                AddLog(L"[INFO] 进入选择模式：拖拽框选区域，ESC/右键取消");
+                RECT rc{};
+                if (ScreenSelectOverlay::SelectRect(rc)) {
+                    selectedRectScreen = rc;
+                    hasSelection = true;
+                    AddLog(L"[INFO] 已选择区域: (" + std::to_wstring(rc.left) + L"," + std::to_wstring(rc.top) + L")-(" +
+                        std::to_wstring(rc.right) + L"," + std::to_wstring(rc.bottom) + L")");
+                    UpdateStatus(L"已选择", L"", L"");
+                }
+                else {
+                    AddLog(L"[WARN] 已取消选择");
+                    UpdateStatus(L"就绪", L"", L"");
+                }
             }
-            else if (sender->Name == "btnStop") {
-                AddLog(L"[WARN] 任务已停止");
-                UpdateStatus(L"已停止", L"", L"");
+            else if (sender->Name == "btnShot") {
+                if (!hasSelection) {
+                    AddLog(L"[WARN] 请先点击“选择”框选区域");
+                    return true;
+                }
+                std::wstring dir = PathUtil::GetTodayFolderPath();
+                if (!PathUtil::EnsureDirExists(dir)) {
+                    AddLog(L"[ERROR] 创建目录失败: " + dir);
+                    return true;
+                }
+                std::wstring outPng = PathUtil::NextPngPathInDir(dir);
+                std::wstring err;
+                if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, outPng, &err)) {
+                    AddLog(L"[ERROR] 截图失败: " + err);
+                    return true;
+                }
+                AddLog(L"[INFO] 截图已保存: " + outPng);
+                UpdateStatus(L"已截图", L"", L"");
             }
-            else if (sender->Name == "btnClear") {
-                ClearLog();
-                AddLog(L"[INFO] 日志已清空");
+            else if (sender->Name == "btnRecognize") {
+                std::wstring dir = PathUtil::GetTodayFolderPath();
+                AddLog(L"[INFO] 开始识别目录: " + dir);
+
+                std::string fileName;
+                std::string fileContentHex;
+                std::string allHex = DrawGrid::RestoreFromFolder(dir, &fileName, &fileContentHex);
+                if (allHex.empty() || fileContentHex.empty()) {
+                    AddLog(L"[ERROR] 识别失败：未还原到有效数据（请确认目录下存在截图）");
+                    UpdateStatus(L"识别失败", L"", L"");
+                    return true;
+                }
+
+                std::wstring wFileName = AppUtil::StrToWStr(fileName);
+                wFileName = PathUtil::SanitizeFileName(wFileName, L"restored.bin");
+
+                std::wstring outPath = PathUtil::GetExeDir() + L"\\" + wFileName;
+                if (!AppUtil::WriteHexStringToFile(fileContentHex, outPath)) {
+                    AddLog(L"[ERROR] 写入还原文件失败: " + outPath);
+                    UpdateStatus(L"识别失败", L"", L"");
+                    return true;
+                }
+
+                AddLog(L"[INFO] 识别成功，已生成文件: " + outPath);
+                UpdateStatus(L"识别成功", L"", L"");
             }
-            else if (sender->Name == "btnSave") {
-                AddLog(L"[INFO] 日志保存成功");
-            }
-            else if (sender->Name == "btnSettings") {
-                AddLog(L"[INFO] 打开设置对话框");
+            else if (sender->Name == "btnClean") {
+                std::wstring dir = PathUtil::GetTodayFolderPath();
+                std::wstring err;
+                if (!PathUtil::RemoveDirRecursive(dir, &err)) {
+                    AddLog(L"[ERROR] 清理失败: " + dir + L" (" + err + L")");
+                    UpdateStatus(L"清理失败", L"", L"");
+                    return true;
+                }
+                AddLog(L"[INFO] 已清理目录: " + dir);
+                UpdateStatus(L"已清理", L"", L"");
             }
             else if (sender->Name == "btnAbout") {
-                MessageBoxW(this->Hwnd(), L"BitGrid v1.0\n基于ezui的日志查看器", L"关于", MB_OK);
+                MessageBoxW(this->Hwnd(), L"BitGrid", L"关于", MB_OK);
             }
         }
         return __super::OnNotify(sender, args);

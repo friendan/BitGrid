@@ -32,6 +32,9 @@ set(PROJECT_SOURCES
     main.cpp
     AppUtil.cpp
     DrawGrid.cpp
+    PathUtil.cpp
+    ScreenCapture.cpp
+    ScreenSelectOverlay.cpp
 )
 
 # 添加项目头文件（让IDE能正确显示）
@@ -39,6 +42,9 @@ set(PROJECT_HEADERS
     AppUtil.hpp
     DrawGrid.hpp
     AppConst.hpp
+    PathUtil.hpp
+    ScreenCapture.hpp
+    ScreenSelectOverlay.hpp
 )
 
 # 添加main.cpp作为主入口文件
