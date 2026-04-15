@@ -32,7 +32,16 @@ static void NormalizeRect(RECT& rc)
 static void ClearSurface(OverlayState* st)
 {
     if (!st || !st->bits) return;
-    memset(st->bits, 0, size_t(st->w) * size_t(st->h) * 4);
+    // 半透明黑色遮罩，便于确认覆盖层已显示
+    const uint8_t a = 80; // 0=全透明, 255=不透明
+    const size_t pxCount = size_t(st->w) * size_t(st->h);
+    uint8_t* p = (uint8_t*)st->bits;
+    for (size_t i = 0; i < pxCount; ++i) {
+        p[i * 4 + 0] = 0;   // B
+        p[i * 4 + 1] = 0;   // G
+        p[i * 4 + 2] = 0;   // R
+        p[i * 4 + 3] = a;   // A
+    }
 }
 
 static void DrawBorderRGBA(OverlayState* st, const RECT& rcLocal, int thickness)
@@ -93,6 +102,16 @@ static void PresentLayered(HWND hwnd, OverlayState* st)
     ReleaseDC(nullptr, hdcScreen);
 }
 
+static POINT GetLocalCursorPoint(OverlayState* st)
+{
+    POINT ptScreen{};
+    GetCursorPos(&ptScreen);
+    POINT ptLocal{};
+    ptLocal.x = ptScreen.x - st->virtualRc.left;
+    ptLocal.y = ptScreen.y - st->virtualRc.top;
+    return ptLocal;
+}
+
 static LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     auto* st = (OverlayState*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
@@ -103,20 +122,20 @@ static LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         if (wParam == VK_ESCAPE && st) {
             st->cancelled = true;
             st->done = true;
-            PostQuitMessage(0);
+            DestroyWindow(hwnd);
         }
         return 0;
     case WM_RBUTTONDOWN:
         if (st) {
             st->cancelled = true;
             st->done = true;
-            PostQuitMessage(0);
+            DestroyWindow(hwnd);
         }
         return 0;
     case WM_LBUTTONDOWN:
         if (st) {
             SetCapture(hwnd);
-            POINT pt{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            POINT pt = GetLocalCursorPoint(st);
             st->start = pt;
             st->cur = pt;
             st->dragging = true;
@@ -126,12 +145,12 @@ static LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         return 0;
     case WM_MOUSEMOVE:
         if (st && st->dragging) {
-            POINT pt{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            POINT pt = GetLocalCursorPoint(st);
             st->cur = pt;
             ClearSurface(st);
             RECT rc{ st->start.x, st->start.y, st->cur.x, st->cur.y };
             NormalizeRect(rc);
-            DrawBorderRGBA(st, rc, 2);
+            DrawBorderRGBA(st, rc, 4);
             PresentLayered(hwnd, st);
         }
         return 0;
@@ -139,7 +158,7 @@ static LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         if (st && st->dragging) {
             ReleaseCapture();
             st->dragging = false;
-            POINT pt{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            POINT pt = GetLocalCursorPoint(st);
             st->cur = pt;
 
             RECT rcLocal{ st->start.x, st->start.y, st->cur.x, st->cur.y };
@@ -151,7 +170,7 @@ static LRESULT CALLBACK OverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             st->result.bottom = st->virtualRc.top + rcLocal.bottom;
 
             st->done = true;
-            PostQuitMessage(0);
+            DestroyWindow(hwnd);
         }
         return 0;
     case WM_DESTROY:
@@ -234,13 +253,14 @@ bool ScreenSelectOverlay::SelectRect(RECT& outRcScreen)
     }
 
     MSG msg{};
-    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
-        if (st.done) break;
     }
 
-    DestroyWindow(hwnd);
+    if (IsWindow(hwnd)) {
+        DestroyWindow(hwnd);
+    }
 
     if (st.memdc) DeleteDC(st.memdc);
     if (st.dib) DeleteObject(st.dib);
