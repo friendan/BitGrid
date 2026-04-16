@@ -32,7 +32,7 @@ static void NormalizeRect(RECT& rc)
 static void ClearSurface(OverlayState* st)
 {
     if (!st || !st->bits) return;
-    // 半透明黑色遮罩，便于确认覆盖层已显示
+    // 半透明黑色遮罩 + 绿色边框（更像截图工具）
     const uint8_t a = 80; // 0=全透明, 255=不透明
     const size_t pxCount = size_t(st->w) * size_t(st->h);
     uint8_t* p = (uint8_t*)st->bits;
