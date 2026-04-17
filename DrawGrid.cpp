@@ -116,73 +116,128 @@ void DrawGrid::ChangePage(int chVal){
     }
 }
 
+// 缓存结构体，用于管理 GDI 资源
+struct GdiCache {
+    HBITMAP hBitmap = nullptr;
+    HDC hdcMem = nullptr;
+    uint32_t* pixels = nullptr;
+    size_t width = 0;
+    size_t height = 0;
+
+    ~GdiCache() {
+        if (hdcMem) {
+            DeleteDC(hdcMem);
+        }
+        if (hBitmap) {
+            DeleteObject(hBitmap);
+        }
+        pixels = nullptr;
+    }
+};
+
 void DrawGrid::DrawHexString(HWND hwnd, HDC hdc){
+    // 参数有效性检查
     if(mWidth < 1 || mHeight < 1 || mPageSize < 1 || mHexString.empty() || mHexString.size() % 2 != 0){
-        AppUtil::SaveLog("DrawHexString param error");
-        AppUtil::SaveLog("mWidth:", mWidth, " mHeight:", mHeight, " mPageSize:", mPageSize, " mCurPage:", mCurPage);
-        AppUtil::SaveLog("mHexString:", mHexString);
+        // AppUtil::SaveLog("DrawHexString param error");
+        // AppUtil::SaveLog("mWidth:", mWidth, " mHeight:", mHeight, " mPageSize:", mPageSize, " mCurPage:", mCurPage);
+        // AppUtil::SaveLog("mHexString:", mHexString);
         return;
     }
 
-    std::string hexString = AppUtil::GetSubStrByPage(mHexString, mPageSize, mCurPage);
-    if(hexString.empty()){
-        AppUtil::SaveLog("hexString is empty mPageSize:", mPageSize, " mCurPage:", mCurPage);
+    // 获取当前页的十六进制字符串（使用视图而非复制）
+    std::string_view hexStringView = AppUtil::GetSubStrViewByPage(mHexString, mPageSize, mCurPage);
+    if(hexStringView.empty()){
+        // AppUtil::SaveLog("hexStringView is empty mPageSize:", mPageSize, " mCurPage:", mCurPage);
         return;
     }
 
-    BITMAPINFO bmi = {0};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = mDrawWidth;
-    bmi.bmiHeader.biHeight = -mDrawHeight;
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32; // ARGB
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    uint32_t* pixels = nullptr;  // pixels[y * width + x] = color; // (x, y)
-    HBITMAP hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
-    HDC hdcMem = CreateCompatibleDC(hdc);
-    SelectObject(hdcMem, hBitmap);
-
-    static uint32_t bkColor = 0xFF000000 | AppConst::BACKGROUND_COLOR;
-    for(size_t i = 0; i < mDrawWidth*mDrawHeight; i++){
-        pixels[i] = bkColor;
-    }
-
+    // 计算绘制区域位置
     const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
     const static int& lineCount = AppConst::BORDER_LINE_COUNT;
     const static uint32_t* BitColor = AppConst::BitColor;
 
-    float xStart = lineOffset + lineCount;
-    float yStart = lineOffset + lineCount;
-    float xMax = mDrawWidth  - lineOffset - lineCount;
-    float yMax = mDrawHeight - lineOffset - lineCount;
+    int xStart = lineOffset + lineCount;
+    int yStart = lineOffset + lineCount;
 
-    // AppUtil::SaveLog("hexString:", hexString);
-    AppUtil::SaveLog("mWidth:", mWidth, " mHeight:", mHeight);
-    AppUtil::SaveLog("mDrawWidth:", mDrawWidth, " mDrawHeight:", mDrawHeight);
-    AppUtil::SaveLog("xStart:", xStart, " yStart:", yStart);
-    AppUtil::SaveLog("xMax:", xMax, " yMax:", yMax);
-    AppUtil::SaveLog("mPageSize:", mPageSize, " mCurPage:", mCurPage);
+     // AppUtil::SaveLog("hexStringView:", hexStringView);
+    // AppUtil::SaveLog("mWidth:", mWidth, " mHeight:", mHeight);
+    // AppUtil::SaveLog("mDrawWidth:", mDrawWidth, " mDrawHeight:", mDrawHeight);
+    // AppUtil::SaveLog("xStart:", xStart, " yStart:", yStart);
+    // AppUtil::SaveLog("xMax:", xMax, " yMax:", yMax);
+    // AppUtil::SaveLog("mPageSize:", mPageSize, " mCurPage:", mCurPage);
+    // AppUtil::SaveLog("bitTotal:", hexStringView.size()*4);
 
-    size_t x = 0;
-    size_t y = 0;
-    uint8_t bits[4] = {0};
-    for(char hexChar: hexString){
-        AppUtil::HexCharToBits(hexChar, bits);
-        pixels[y * mDrawWidth + x++] = BitColor[bits[0]];
-        pixels[y * mDrawWidth + x++] = BitColor[bits[1]];
-        pixels[y * mDrawWidth + x++] = BitColor[bits[2]];
-        pixels[y * mDrawWidth + x++] = BitColor[bits[3]];
-        if(x >= mDrawWidth){
-            x = 0;
-            y += 1;
+    // 碰到的问题：
+    // 行尾剩余空间 不足 4 个像素 时
+    // 你依然强行写 4 个
+    // 直接越界写到下一行，覆盖数据
+
+    // 严格按顺序往 pixels 数组里线性填充（0 → 1 → 2 → 3 → ... 一直往后写）
+    // 不需要判断一行够不够 4 个像素
+    // 不需要自动换行
+    // 数组空间一定足够，只管顺序写满
+
+    // 静态缓存，避免频繁创建 GDI 资源
+    static GdiCache cache;
+
+    // 检查缓存是否有效
+    if (cache.width != mDrawWidth || cache.height != mDrawHeight) {
+        // 缓存无效，重新创建
+        cache = GdiCache(); // 调用析构函数释放旧资源
+
+        // 创建 DIB Section
+        BITMAPINFO bmi = {0};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = static_cast<LONG>(mDrawWidth);
+        bmi.bmiHeader.biHeight = -static_cast<LONG>(mDrawHeight);
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32; // ARGB
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        cache.hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void**)&cache.pixels, NULL, 0);
+        if (!cache.hBitmap || !cache.pixels) {
+            return; // 创建失败
         }
+
+        cache.hdcMem = CreateCompatibleDC(hdc);
+        if (!cache.hdcMem) {
+            return; // 创建失败
+        }
+
+        SelectObject(cache.hdcMem, cache.hBitmap);
+        cache.width = mDrawWidth;
+        cache.height = mDrawHeight;
     }
 
-    BitBlt(hdc, xStart, yStart, mDrawWidth, mDrawHeight, hdcMem, 0, 0, SRCCOPY);
-    DeleteDC(hdcMem);
-    DeleteObject(hBitmap);
-    AppUtil::SaveLog("DrawHexString finish");
+    // 填充背景色
+    static uint32_t bkColor = 0xFF000000 | AppConst::BACKGROUND_COLOR;
+    size_t pixelCount = mDrawWidth * mDrawHeight;
+    for(size_t i = 0; i < pixelCount; i++){
+        cache.pixels[i] = bkColor;
+    }
+
+    size_t index = 0;
+    uint8_t bits[4] = {0};
+    for(char hexChar: hexStringView){
+        AppUtil::HexCharToBits(hexChar, bits);
+        cache.pixels[index++] = BitColor[bits[0]];
+        cache.pixels[index++] = BitColor[bits[1]];
+        cache.pixels[index++] = BitColor[bits[2]];
+        cache.pixels[index++] = BitColor[bits[3]];
+
+        // AppUtil::SaveLog("hexChar:", hexChar
+        //     , " index: ", index
+        //     , " bits: "
+        //     , bits[0], " "
+        //     , bits[1], " "
+        //     , bits[2], " "
+        //     , bits[3]
+        // );
+    }
+
+    // 将绘制内容复制到窗口
+    BitBlt(hdc, xStart, yStart, static_cast<int>(mDrawWidth), static_cast<int>(mDrawHeight), cache.hdcMem, 0, 0, SRCCOPY);
+    // AppUtil::SaveLog("DrawHexString finish");
 }
 
 //=============================================================================
@@ -601,3 +656,4 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
     
     return result;
 }
+

@@ -49,7 +49,8 @@ public:
 	size_t mCurPage   = 1; // 从1开始
 	size_t mDrawWidth = 0;
     size_t mDrawHeight = 0;
-    std::string mHexString = "0123456789ABCDEF";
+    // std::string mHexString = "0123456789ABCDEF";
+    std::string mHexString;
 
 private:
     // GDI+ 全局变量
