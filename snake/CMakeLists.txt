@@ -23,9 +23,9 @@ if(MSVC)
     endforeach()
 endif()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 
 remove_definitions(-D_MBCS)
 add_definitions(-DUNICODE -D_UNICODE)
@@ -33,16 +33,35 @@ add_definitions(-DUNICODE -D_UNICODE)
 # 强制MSVC编译器用UTF-8解析源码
 add_compile_options(/utf-8)
 
-set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(TARGET_NAME SnakeD2D)
-file(GLOB_RECURSE SRC_FILES
-    ${SRC_DIR}/*.hpp
-    ${SRC_DIR}/*.cpp
-    ${SRC_DIR}/*.rc
-)
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_FILES})
 
-add_executable(${TARGET_NAME} WIN32 ${SRC_FILES})
+# ===================== 引入上级目录的公共文件 =====================
+# 定义上级目录路径（使用 CMAKE_CURRENT_SOURCE_DIR 指向 snake 目录）
+set(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
+# 公共文件列表
+set(COMMON_FILES
+    ${PARENT_DIR}/AppConst.hpp
+    ${PARENT_DIR}/AppUtil.hpp
+    ${PARENT_DIR}/AppUtil.cpp
+    ${PARENT_DIR}/DrawGrid.hpp
+    ${PARENT_DIR}/DrawGrid.cpp
+)
+
+# 收集 snake 自身的源文件
+file(GLOB_RECURSE SNAKE_SRC_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.rc
+)
+
+# 合并所有源文件
+set(ALL_SRC_FILES ${SNAKE_SRC_FILES} ${COMMON_FILES})
+
+add_executable(${TARGET_NAME} WIN32 ${ALL_SRC_FILES})
+
+# 添加公共文件头文件目录（上级目录）
+target_include_directories(${TARGET_NAME} PRIVATE ${PARENT_DIR})
 target_link_libraries(${TARGET_NAME} PRIVATE shell32.lib comctl32.lib shlwapi.lib winmm.lib d2d1.lib dwrite.lib gdiplus.lib)
 
 set_target_properties(${TARGET_NAME} PROPERTIES

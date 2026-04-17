@@ -70,3 +70,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # 确保资源文件依赖关系
 set_property(SOURCE BitGrid.rc PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/main.htm)
+
+############################### snake #################################
+
+# 将 snake 作为子工程引入，独立编译为 GridGame.exe
+add_subdirectory(snake)
+
+
+
+
+
+
