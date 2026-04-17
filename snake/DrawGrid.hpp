@@ -27,6 +27,20 @@ public:
 	void InitGdiPlus();
 	void UninitGdiPlus();
 
+	static COLORREF ColorToRGB(const Gdiplus::Color& color);
+
+	// 从截图还原十六进制字符串
+	// 单页情况：传入图片路径，返回还原的十六进制字符串
+	// 输出参数：outFileName 返回文件名，outFileContentHex 返回文件内容的十六进制
+	static std::string RestoreFromImage(const std::wstring& imagePath, 
+	                                     std::string* outFileName = nullptr,
+	                                     std::string* outFileContentHex = nullptr);
+	// 多页情况：传入文件夹路径，返回还原的十六进制字符串（按文件创建时间排序）
+	// 输出参数：outFileName 返回文件名，outFileContentHex 返回文件内容的十六进制
+	static std::string RestoreFromFolder(const std::wstring& folderPath,
+	                                      std::string* outFileName = nullptr,
+	                                      std::string* outFileContentHex = nullptr);
+
 public:
 	size_t mWidth = 0;
 	size_t mHeight = 0;
