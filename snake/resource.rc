@@ -1,0 +1,54 @@
+#include "common.h"
+#include "resource.h"
+
+IDI_APPLICATION ICON "assets/icon.ico"
+
+// Food tiles
+IDB_SNAKE_FOOD_TILE1 BITMAP "assets/food1.bmp"
+IDB_SNAKE_FOOD_TILE2 BITMAP "assets/food2.bmp"
+IDB_SNAKE_FOOD_TILE3 BITMAP "assets/food3.bmp"
+IDB_SNAKE_FOOD_TILE4 BITMAP "assets/food4.bmp"
+IDB_SNAKE_FOOD_TILE5 BITMAP "assets/food5.bmp"
+IDB_SNAKE_FOOD_TILE6 BITMAP "assets/food6.bmp"
+IDB_SNAKE_FOOD_TILE7 BITMAP "assets/food7.bmp"
+IDB_SNAKE_FOOD_TILE8 BITMAP "assets/food8.bmp"
+IDB_SNAKE_FOOD_TILE9 BITMAP "assets/food9.bmp"
+
+// Sound effects
+IDW_SOUND_EAT WAVE "assets/eat.wav"
+IDW_SOUND_GAME_OVER WAVE "assets/game_over.wav"
+IDW_SOUND_WIN WAVE "assets/tada.wav"
+
+#include <winver.h>
+VS_VERSION_INFO		VERSIONINFO
+FILEVERSION			VERSION_SEQ
+PRODUCTVERSION		VERSION_SEQ
+FILEFLAGSMASK		VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+	FILEFLAGS		VS_FF_DEBUG | VS_FF_PRERELEASE
+#else
+	FILEFLAGS		0
+#endif
+FILEOS				VOS_NT_WINDOWS32
+FILETYPE			VFT_APP
+FILESUBTYPE			VFT2_UNKNOWN
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904b0"
+		BEGIN
+			VALUE "CompanyName", "Maku Maku"
+			VALUE "FileDescription", "A version of Snake written in C++ and using Direct2D"
+			VALUE "FileVersion", VERSION_STR
+			VALUE "InternalName", "Win32App"
+			VALUE "LegalCopyright", "\xA92022 Maku Maku"
+			VALUE "OriginalFileName", "SnakeD2D.exe"
+			VALUE "ProductName", "SnakeD2D"
+			VALUE "ProductVersion", VERSION_STR
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x409, 1200
+	END
+END
