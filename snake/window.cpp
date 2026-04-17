@@ -1703,6 +1703,35 @@ void snake::Application::UpdatePixelOverlayPosition() {
     int clientWidth = rcClient.right - rcClient.left;
     int clientHeight = rcClient.bottom - rcClient.top;
 
+    // 如果尺寸发生变化，需要重新创建 DIB
+    if (clientWidth != m_overlayWidth || clientHeight != m_overlayHeight) {
+        // 销毁旧的 DIB
+        if (m_hOverlayBitmap) {
+            DeleteObject(m_hOverlayBitmap);
+            m_hOverlayBitmap = nullptr;
+        }
+        m_pOverlayPixels = nullptr;
+        
+        // 更新尺寸
+        m_overlayWidth = clientWidth;
+        m_overlayHeight = clientHeight;
+        
+        // 创建新的 DIB
+        BITMAPINFO bmi = {0};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = m_overlayWidth;
+        bmi.bmiHeader.biHeight = -m_overlayHeight;  // 自上而下
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        m_hOverlayBitmap = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&m_pOverlayPixels, NULL, 0);
+        if (!m_hOverlayBitmap || !m_pOverlayPixels) {
+            AppUtil::SaveLog("[PixelOverlay] Resize: CreateDIBSection failed");
+            return;
+        }
+    }
+
     // 调整窗口位置和客户区大小
     SetWindowPos(m_hPixelOverlay, HWND_TOPMOST,
                  rcClient.left, rcClient.top,
