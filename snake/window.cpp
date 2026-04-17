@@ -1282,9 +1282,9 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		break;
 	}
 case VK_F7:{
-		mIsDrawGame = false;
-		this->m_snakeLogic.m_sInfo.scoring.paused = 1;
-		::InvalidateRect(this->m_hwnd, nullptr, FALSE);
+		// mIsDrawGame = false;
+		// this->m_snakeLogic.m_sInfo.scoring.paused = 1;
+		// ::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 		break;
 	}
 	case VK_F11:
