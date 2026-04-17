@@ -173,6 +173,22 @@ std::string AppUtil::GetSubStrByPage(const std::string& str, size_t pageSize, si
     return str.substr(startPos, endPos - startPos);
 }
 
+std::string_view AppUtil::GetSubStrViewByPage(const std::string& str, size_t pageSize, size_t pageNum){
+    if(str.empty() || pageSize < 1 || pageNum < 1){
+        return std::string_view();
+    }
+    size_t totalPages = (str.size() + pageSize - 1) / pageSize;
+    if(pageNum > totalPages){
+        return std::string_view();
+    }
+    size_t startPos = (pageNum - 1)*pageSize;
+    size_t endPos = startPos + pageSize;
+    if(endPos > str.size()){
+        endPos = str.size();
+    }
+    return std::string_view(str.data() + startPos, endPos - startPos);
+}
+
 std::string AppUtil::GetTimeStr(){
     time_t now = time(nullptr);
     tm t{};

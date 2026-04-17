@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <cstdint>  // 必须包含，用于uint8_t
 #include <string>
+#include <string_view>
 
 class AppUtil
 {
@@ -65,6 +66,15 @@ public:
      * @return 返回指定页的字符串
      */
     static std::string GetSubStrByPage(const std::string& str, size_t pageSize, size_t pageNum);
+    
+    /**
+     * @brief 按分页方式获取子字符串视图（避免复制）
+     * @param str 原始字符串
+     * @param pageSize 每页字符数
+     * @param pageNum  也码(从1开始)
+     * @return 返回指定页的字符串视图
+     */
+    static std::string_view GetSubStrViewByPage(const std::string& str, size_t pageSize, size_t pageNum);
 
 	static std::string GetTimeStr();
     static void SaveLog(const std::string& msg);
