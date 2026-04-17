@@ -19,6 +19,7 @@ public:
 	void DrawBorder(HWND hwnd, HDC hdc);
 	void DrawHexString(HWND hwnd, HDC hdc);
 	void DrawPixGrid(HWND hwnd);
+	void DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t* pPixels, int width, int height);
 
 	void SetHexString(const std::string& hexString);
 	void NextPage();

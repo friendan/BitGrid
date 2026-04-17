@@ -9,6 +9,10 @@
 #include <iomanip>
 using namespace Gdiplus;
 
+// ARGB 颜色宏：A=Alpha, R=Red, G=Green, B=Blue
+// 注意：DIB 使用 BGRA 格式（小端序），内存中存储为 BB GG RR AA
+#define ARGB(a, r, g, b) ((uint32_t)(((a) << 24) | ((r) << 16) | ((g) << 8) | (b)))
+
 
 //=============================================================================
 // 初始化 GDI+
@@ -89,6 +93,53 @@ void DrawGrid::DrawPixGrid(HWND hwnd){
         DrawBorder(hwnd, hdc);
         DrawHexString(hwnd, hdc);
     ::EndPaint(hwnd, &ps);
+}
+
+void DrawGrid::DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t* pPixels, int width, int height){
+    if (!hwndOverlay || !hBitmap || !pPixels || width <= 0 || height <= 0) {
+        return;
+    }
+
+    // 填充半透明护眼绿背景 (Alpha=128, R=199, G=237, B=204)
+    // uint32_t debugBgColor = ARGB(255, 199, 237, 204);
+    uint32_t debugBgColor = ARGB(32, 199, 237, 204);
+    for (int i = 0; i < width * height; i++) {
+        pPixels[i] = debugBgColor;
+    }
+
+    // 使用 UpdateLayeredWindow 更新分层窗口
+    HDC hdcScreen = GetDC(NULL);
+    HDC hdcMem = CreateCompatibleDC(hdcScreen);
+    SelectObject(hdcMem, hBitmap);
+
+    POINT ptDst = {0, 0};
+    SIZE size = {(LONG)width, (LONG)height};
+    POINT ptSrc = {0, 0};
+    
+    BLENDFUNCTION blend = {0};
+    blend.BlendOp = AC_SRC_OVER;
+    blend.SourceConstantAlpha = 200;  // 使用整体透明度（与像素 Alpha 一致）调整 blend.SourceConstantAlpha 的值来控制整体透明度
+    blend.AlphaFormat = 0;  // 不使用像素级 Alpha，使用 SourceConstantAlpha
+
+    RECT rcWindow;
+    GetWindowRect(hwndOverlay, &rcWindow);
+    ptDst.x = rcWindow.left;
+    ptDst.y = rcWindow.top;
+
+    UpdateLayeredWindow(
+        hwndOverlay,
+        hdcScreen,
+        &ptDst,
+        &size,
+        hdcMem,
+        &ptSrc,
+        0,
+        &blend,
+        ULW_ALPHA
+    );
+
+    DeleteDC(hdcMem);
+    ReleaseDC(NULL, hdcScreen);
 }
 
 void DrawGrid::SetHexString(const std::string& hexString){

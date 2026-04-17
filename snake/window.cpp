@@ -2,6 +2,7 @@
 #include "resource.h"
 #include "DrawGrid.hpp"
 #include "AppUtil.hpp"
+#include "AppConst.hpp"
 
 #include <tgmath.h>
 #include <ctime>
@@ -31,6 +32,7 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 
 			This->CenterWindowOnMonitor(hwnd);
 			This->UpdateWindowTitle();
+			// 不在 WM_CREATE 中创建分层窗口，等到第一次进入绘制模式时再创建
 			return 0;
 		}
 		else [[unlikely]]
@@ -98,6 +100,19 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 		::GetClientRect(hwnd, &r);
 		This->onResize(r.right - r.left, r.bottom - r.top);
 		This->UpdateWindowTitle();
+		
+		// 更新分层窗口位置
+		if (!This->mIsDrawGame && This->m_hPixelOverlay) {
+			This->UpdatePixelOverlayPosition();
+		}
+		break;
+	}
+	case WM_MOVE:
+	{
+		// 窗口移动时更新分层窗口位置
+		if (!This->mIsDrawGame && This->m_hPixelOverlay) {
+			This->UpdatePixelOverlayPosition();
+		}
 		break;
 	}
 	case WM_DPICHANGED:
@@ -675,6 +690,9 @@ snake::Application::Application(LPCWSTR lpCmdArgs) noexcept
 
 snake::Application::~Application() noexcept
 {
+	// 销毁分层窗口
+	DestroyPixelOverlay();
+	
 	this->destroyAssets();
 	snake::safeRelease(this->m_pDWriteFactory);
 	snake::safeRelease(this->m_pD2DFactory);
@@ -1121,10 +1139,15 @@ void snake::Application::destroyAssets() noexcept
 }
 
 void snake::Application::onRenderWindow() noexcept{
+	CreatePixelOverlay();
 	if(mIsDrawGame){
 		onRender();
 	}else{
-		DrawGrid::Inst()->DrawPixGrid(this->m_hwnd);
+		// AppUtil::SaveLog("[PixelOverlay] Entering pixel draw mode");
+		// 使用分层窗口绘制像素数据（颜色 100% 精确）
+		// DrawGrid::Inst()->DrawPixGrid(this->m_hwnd);
+		UpdatePixelOverlayPosition();
+		UpdatePixelOverlayFromDrawGrid();
 		UpdateDrawGridInfo();
 	}
 }
@@ -1256,6 +1279,12 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 			::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 			mPressF6Sum = 0;
 		}
+		break;
+	}
+case VK_F7:{
+		mIsDrawGame = false;
+		this->m_snakeLogic.m_sInfo.scoring.paused = 1;
+		::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 		break;
 	}
 	case VK_F11:
@@ -1566,6 +1595,134 @@ void snake::Application::UpdateDrawGridInfo(){
     // 	swprintf_s(wszBuff, L"%s", whexStr.substr(0,128).c_str());
     // 	UpdateStatusBarText(5, wszBuff);
     // }
+}
+
+//=============================================================================
+// 分层窗口（Layered Window）实现 - 用于精确绘制像素数据
+//=============================================================================
+
+// 创建分层窗口
+bool snake::Application::CreatePixelOverlay() {
+    if (m_hPixelOverlay) {
+        // AppUtil::SaveLog("[PixelOverlay] Already created, skipping");
+        return true;  // 已经创建
+    }
+
+    // 获取主窗口客户区大小
+    RECT rcClient;
+    GetClientRect(m_hwnd, &rcClient);
+    m_overlayWidth = rcClient.right - rcClient.left;
+    m_overlayHeight = rcClient.bottom - rcClient.top;
+
+    // 检查尺寸是否有效
+    if (m_overlayWidth <= 0 || m_overlayHeight <= 0) {
+        AppUtil::SaveLog("[PixelOverlay] Invalid window size: ", std::to_string(m_overlayWidth), "x", std::to_string(m_overlayHeight));
+        return false;
+    }
+
+    // AppUtil::SaveLog("[PixelOverlay] Creating layered window, size: ", std::to_string(m_overlayWidth), "x", std::to_string(m_overlayHeight));
+
+    // 创建 32 位 DIB
+    BITMAPINFO bmi = {0};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = m_overlayWidth;
+    bmi.bmiHeader.biHeight = -m_overlayHeight;  // 自上而下
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    m_pOverlayPixels = nullptr;
+    m_hOverlayBitmap = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&m_pOverlayPixels, NULL, 0);
+    if (!m_hOverlayBitmap || !m_pOverlayPixels) {
+        DWORD err = GetLastError();
+        AppUtil::SaveLog("[PixelOverlay] CreateDIBSection failed, error code: ", std::to_string(err));
+        return false;
+    }
+
+    // AppUtil::SaveLog("[PixelOverlay] DIB created, pixels at: ", std::to_string((uintptr_t)m_pOverlayPixels));
+    
+    // 注册窗口类
+    WNDCLASSEXW wcex = {0};
+    wcex.cbSize = sizeof(WNDCLASSEXW);
+    wcex.lpfnWndProc = DefWindowProcW;  // 使用默认窗口过程
+    wcex.hInstance = GetModuleHandleW(NULL);
+    wcex.hCursor = LoadCursorW(NULL, IDC_ARROW);
+    wcex.hbrBackground = NULL;  // 无背景
+    wcex.lpszClassName = L"PixelOverlayWindowClass";
+    
+    // 如果窗口类已注册，RegisterClassExW 会失败，但这没关系
+    RegisterClassExW(&wcex);
+    
+    // 创建真正的分层窗口
+    m_hPixelOverlay = CreateWindowExW(
+        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,  // 分层 + 顶层 + 透明 + 不激活
+        L"PixelOverlayWindowClass",     // 自定义窗口类
+        L"PixelOverlay",                // 窗口标题
+        WS_POPUP | WS_VISIBLE,          // 弹出窗口 + 可见
+        0, 0, m_overlayWidth, m_overlayHeight,
+        NULL,                           // 无父窗口（避免父子关系导致的问题）
+        NULL,                           // 无菜单
+        GetModuleHandleW(NULL),         // 实例句柄
+        NULL                            // 无额外参数
+    );
+
+    if (!m_hPixelOverlay) {
+        AppUtil::SaveLog("[PixelOverlay] CreateWindowExW failed, error: ", std::to_string(GetLastError()));
+        return false;
+    }
+
+    // AppUtil::SaveLog("[PixelOverlay] Real layered window created successfully, hwnd=", std::to_string((uintptr_t)m_hPixelOverlay));
+    return true;
+}
+
+// 销毁分层窗口
+void snake::Application::DestroyPixelOverlay() {
+    if (m_hPixelOverlay) {
+        DestroyWindow(m_hPixelOverlay);
+        m_hPixelOverlay = nullptr;
+    }
+    if (m_hOverlayBitmap) {
+        DeleteObject(m_hOverlayBitmap);
+        m_hOverlayBitmap = nullptr;
+    }
+    m_pOverlayPixels = nullptr;
+}
+
+// 更新分层窗口位置（跟随主窗口客户区）
+void snake::Application::UpdatePixelOverlayPosition() {
+    if (!m_hPixelOverlay || !m_hwnd) {
+        return;
+    }
+
+    // 获取主窗口客户区在屏幕上的位置
+    RECT rcClient;
+    GetClientRect(m_hwnd, &rcClient);
+    ClientToScreen(m_hwnd, (LPPOINT)&rcClient.left);
+    ClientToScreen(m_hwnd, (LPPOINT)&rcClient.right);
+
+    int clientWidth = rcClient.right - rcClient.left;
+    int clientHeight = rcClient.bottom - rcClient.top;
+
+    // 调整窗口位置和客户区大小
+    SetWindowPos(m_hPixelOverlay, HWND_TOPMOST,
+                 rcClient.left, rcClient.top,
+                 clientWidth, clientHeight,
+                 SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
+// 绘制像素数据到分层窗口（调用 DrawGrid 绘制）
+void snake::Application::UpdatePixelOverlayFromDrawGrid() {
+    if (!m_hPixelOverlay || !DrawGrid::Inst() || !m_hOverlayBitmap || !m_pOverlayPixels) {
+        return;
+    }
+
+    DrawGrid::Inst()->DrawPixGridToOverlay(
+        m_hPixelOverlay, 
+        m_hOverlayBitmap, 
+        m_pOverlayPixels, 
+        m_overlayWidth, 
+        m_overlayHeight
+    );
 }
 
 

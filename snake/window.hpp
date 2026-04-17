@@ -34,6 +34,14 @@ namespace snake
 		HINSTANCE m_hInst{ nullptr };
 		LPCWSTR m_lpCmdArgs;
 		HWND m_hwnd{ nullptr };
+			
+		// 分层窗口（像素覆盖层）
+		HWND m_hPixelOverlay{ nullptr };       // 分层窗口句柄
+		HBITMAP m_hOverlayBitmap{ nullptr };   // 覆盖层位图
+		uint32_t* m_pOverlayPixels{ nullptr }; // 像素数据指针
+		int m_overlayWidth{ 0 };               // 覆盖层宽度
+		int m_overlayHeight{ 0 };              // 覆盖层高度
+			
 		dx::Factory * m_pD2DFactory{ nullptr };
 		dw::Factory * m_pDWriteFactory{ nullptr };
 		dx::HwndRT * m_pRT{ nullptr };
@@ -263,7 +271,13 @@ namespace snake
 		void UpdateWindowTitle();
 		void UpdateDrawGridInfo();
 		void ClearDrawGridInfo();
-
+				
+		// 分层窗口相关
+		bool CreatePixelOverlay();
+		void DestroyPixelOverlay();
+		void UpdatePixelOverlayPosition();
+		void UpdatePixelOverlayFromDrawGrid();
+				
 		 // 状态栏
 	    bool CreateStatusBar();
 	    void UpdateStatusBarText(int part, LPCWSTR text);
