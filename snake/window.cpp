@@ -360,8 +360,9 @@ void snake::Application::TextStruct::onRender(dx::SzF const & tileSz, dx::HwndRT
 			digit[1] = L'0' + wchar_t(milliseconds % 10);
 			txt += digit;
 		}
-		ltop    = Application::s_calcToTile(tileSz, 0, Application::s_fieldHeight - 1);
-		rbottom = Application::s_calcToTile(tileSz, Application::s_fieldWidth, Application::s_fieldHeight);
+		// 时间显示位置向上调整 3 行，避免被状态栏遮挡
+		ltop    = Application::s_calcToTile(tileSz, 0, Application::s_fieldHeight - 4);
+		rbottom = Application::s_calcToTile(tileSz, Application::s_fieldWidth, Application::s_fieldHeight - 1);
 		pRT->DrawTextW(
 			txt.c_str(),
 			dx::U32(txt.size()),
@@ -1688,7 +1689,7 @@ void snake::Application::DestroyPixelOverlay() {
     m_pOverlayPixels = nullptr;
 }
 
-// 更新分层窗口位置（跟随主窗口客户区）
+// 更新分层窗口位置（跟随主窗口客户区，避开状态栏）
 void snake::Application::UpdatePixelOverlayPosition() {
     if (!m_hPixelOverlay || !m_hwnd) {
         return;
@@ -1703,8 +1704,20 @@ void snake::Application::UpdatePixelOverlayPosition() {
     int clientWidth = rcClient.right - rcClient.left;
     int clientHeight = rcClient.bottom - rcClient.top;
 
+    // 如果有状态栏，减去状态栏的高度，并留出额外边距
+    int statusBarHeight = 0;
+    if (m_hStatusBar) {
+        RECT rcStatus;
+        GetWindowRect(m_hStatusBar, &rcStatus);
+        statusBarHeight = rcStatus.bottom - rcStatus.top;
+    }
+
+    // 分层窗口高度 = 客户区高度 - 状态栏高度 - 额外边距（避免遮挡时间）
+    int extraMargin = 0;  // 额外边距，让时间显示更清晰
+    int overlayHeight = clientHeight - statusBarHeight - extraMargin;
+
     // 如果尺寸发生变化，需要重新创建 DIB
-    if (clientWidth != m_overlayWidth || clientHeight != m_overlayHeight) {
+    if (clientWidth != m_overlayWidth || overlayHeight != m_overlayHeight) {
         // 销毁旧的 DIB
         if (m_hOverlayBitmap) {
             DeleteObject(m_hOverlayBitmap);
@@ -1714,7 +1727,7 @@ void snake::Application::UpdatePixelOverlayPosition() {
         
         // 更新尺寸
         m_overlayWidth = clientWidth;
-        m_overlayHeight = clientHeight;
+        m_overlayHeight = overlayHeight;
         
         // 创建新的 DIB
         BITMAPINFO bmi = {0};
@@ -1732,10 +1745,10 @@ void snake::Application::UpdatePixelOverlayPosition() {
         }
     }
 
-    // 调整窗口位置和客户区大小
+    // 调整窗口位置和客户区大小（从客户区顶部开始，高度不包括状态栏）
     SetWindowPos(m_hPixelOverlay, HWND_TOPMOST,
                  rcClient.left, rcClient.top,
-                 clientWidth, clientHeight,
+                 clientWidth, overlayHeight,
                  SWP_NOACTIVATE | SWP_SHOWWINDOW);
 }
 
