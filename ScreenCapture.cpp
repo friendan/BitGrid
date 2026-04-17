@@ -31,6 +31,7 @@ static int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
 bool ScreenCapture::CaptureRectToPng(const RECT& rcScreen, const std::wstring& outPngPath, std::wstring* errMsg)
 {
+    // TODO 使用内存 DC 截图?
     int w = rcScreen.right - rcScreen.left;
     int h = rcScreen.bottom - rcScreen.top;
     if (w <= 0 || h <= 0) {
