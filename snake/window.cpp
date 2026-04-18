@@ -1352,7 +1352,11 @@ LRESULT snake::Application::onKeyRelease(WPARAM wp, LPARAM lp) noexcept
 
 snake::Tile snake::Application::makeRandomSnakeTile() noexcept
 {
-	static std::uniform_int_distribution<long> wDist(0, long(this->s_fieldWidth) - 1), hDist(0, long(this->s_fieldHeight) - 1);
+	// 食物生成时避开底部 6 行，避免被状态栏/任务栏遮挡
+	static constexpr long s_foodMaxYOffset = 6;
+	static std::uniform_int_distribution<long> wDist(0, long(this->s_fieldWidth) - 1);
+	static std::uniform_int_distribution<long> hDist(0, long(this->s_fieldHeight) - 1 - s_foodMaxYOffset);
+	
 	return Tile(
 		this->m_tileSzF,
 		this->calcToTile(wDist(this->m_rng), hDist(this->m_rng)),
