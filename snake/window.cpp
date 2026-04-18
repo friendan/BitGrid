@@ -87,6 +87,23 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 		}
 		break;
 	}
+	case WM_ENTERSIZEMOVE:
+	{
+		// 开始调整大小，设置标志
+		This->m_bIsSizing = true;
+		return 0;
+	}
+	case WM_EXITSIZEMOVE:
+	{
+		// 结束调整大小，清除标志并强制更新
+		This->m_bIsSizing = false;
+		if (!This->mIsDrawGame && This->m_hPixelOverlay) {
+			This->UpdatePixelOverlayPosition();
+			This->UpdatePixelOverlayFromDrawGrid();
+		}
+		::InvalidateRect(This->m_hwnd, nullptr, FALSE);
+		return 0;
+	}
 	case WM_SIZE:
 	{
 		// 先让系统给状态栏排版
@@ -1208,14 +1225,8 @@ void snake::Application::onResize(UINT width, UINT height) noexcept
 	this->m_pRT->Resize(dx::SzU{ width, height });
 	this->p_calcPositions();
 
-	// 加这一行强制重绘状态栏
-    if (m_hStatusBar) {
-        // RedrawWindow(m_hStatusBar, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
-        // ShowWindow(m_hStatusBar, SW_HIDE);
-    }
-
-	// 只在非绘制模式下更新分层窗口位置（避免频繁重建 DIB）
-	if (!mIsDrawGame && m_hPixelOverlay) {
+	// 拖动过程中不更新分层窗口，避免闪烁
+	if (!m_bIsSizing && !mIsDrawGame && m_hPixelOverlay) {
 		UpdatePixelOverlayPosition();
 		UpdatePixelOverlayFromDrawGrid();
 	}
@@ -1584,6 +1595,11 @@ void snake::Application::UpdateWindowTitle()
 
 
 void snake::Application::UpdateDrawGridInfo(){
+	// 拖动窗口大小时不更新状态栏，避免闪烁
+	if (m_bIsSizing) {
+		return;
+	}
+	
 	static DrawGrid* pDrawGrid = DrawGrid::Inst();
 	
 	// 缓存上一次的值，只在变化时更新

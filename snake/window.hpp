@@ -105,6 +105,9 @@ namespace snake
 		POINT m_minSize{ .x = 640, .y = 480 };
 		static constexpr dx::F s_tileSz{ 18.f }, s_fieldWidth{ 63.f }, s_fieldHeight{ 36.f };
 		dx::SzF m_tileSzF{ s_tileSz, s_tileSz };
+		
+		// 窗口大小调整标志
+		bool m_bIsSizing{ false };
 
 
 		static LRESULT CALLBACK sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp) noexcept;
