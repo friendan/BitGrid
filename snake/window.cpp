@@ -1585,18 +1585,50 @@ void snake::Application::UpdateWindowTitle()
 
 void snake::Application::UpdateDrawGridInfo(){
 	static DrawGrid* pDrawGrid = DrawGrid::Inst();
+	
+	// 缓存上一次的值，只在变化时更新
+	static size_t lastWidth = 0;
+	static size_t lastHeight = 0;
+	static size_t lastPageSize = 0;
+	static size_t lastTotalPage = 0;
+	static size_t lastCurPage = 0;
+	static size_t lastFileSize = 0;
+	
+	size_t curWidth = pDrawGrid->mDrawWidth;
+	size_t curHeight = pDrawGrid->mDrawHeight;
+	size_t curPageSize = pDrawGrid->mPageSize;
+	size_t curTotalPage = pDrawGrid->mTotalPage;
+	size_t curCurPage = pDrawGrid->mCurPage;
+	size_t curFileSize = AppUtil::DrawFileSize;
+	
 	wchar_t wszBuff[256] = {0};
-    swprintf_s(wszBuff, L"%zux%zu", pDrawGrid->mDrawWidth, pDrawGrid->mDrawHeight);
-    UpdateStatusBarText(0, wszBuff);
-
-    swprintf_s(wszBuff, L"%zu", pDrawGrid->mPageSize);
-    UpdateStatusBarText(1, wszBuff);
-
-    swprintf_s(wszBuff, L"%zu | %zu", pDrawGrid->mTotalPage, pDrawGrid->mCurPage);
-    UpdateStatusBarText(2, wszBuff);
-
-    swprintf_s(wszBuff, L"%zu", AppUtil::DrawFileSize);
-    UpdateStatusBarText(3, wszBuff);
+	
+	// 只有数据变化时才更新状态栏
+	if (curWidth != lastWidth || curHeight != lastHeight) {
+		swprintf_s(wszBuff, L"%zux%zu", curWidth, curHeight);
+		UpdateStatusBarText(0, wszBuff);
+		lastWidth = curWidth;
+		lastHeight = curHeight;
+	}
+	
+	if (curPageSize != lastPageSize) {
+		swprintf_s(wszBuff, L"%zu", curPageSize);
+		UpdateStatusBarText(1, wszBuff);
+		lastPageSize = curPageSize;
+	}
+	
+	if (curTotalPage != lastTotalPage || curCurPage != lastCurPage) {
+		swprintf_s(wszBuff, L"%zu | %zu", curTotalPage, curCurPage);
+		UpdateStatusBarText(2, wszBuff);
+		lastTotalPage = curTotalPage;
+		lastCurPage = curCurPage;
+	}
+	
+	if (curFileSize != lastFileSize) {
+		swprintf_s(wszBuff, L"%zu", curFileSize);
+		UpdateStatusBarText(3, wszBuff);
+		lastFileSize = curFileSize;
+	}
 
     // std::wstring whexStr = AppUtil::StrToWStr(pDrawGrid->mHexString);
     // if(whexStr.size() > 0){
