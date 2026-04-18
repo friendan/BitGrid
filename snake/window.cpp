@@ -360,8 +360,8 @@ void snake::Application::TextStruct::onRender(dx::SzF const & tileSz, dx::HwndRT
 			digit[1] = L'0' + wchar_t(milliseconds % 10);
 			txt += digit;
 		}
-		// 时间显示位置向上调整 3 行，避免被状态栏遮挡
-		ltop    = Application::s_calcToTile(tileSz, 0, Application::s_fieldHeight - 4);
+		// 时间显示位置向上调整 5 行，避免被状态栏遮挡
+		ltop    = Application::s_calcToTile(tileSz, 0, Application::s_fieldHeight - 6);
 		rbottom = Application::s_calcToTile(tileSz, Application::s_fieldWidth, Application::s_fieldHeight - 1);
 		pRT->DrawTextW(
 			txt.c_str(),
@@ -1210,8 +1210,15 @@ void snake::Application::onResize(UINT width, UINT height) noexcept
 
 	// 加这一行强制重绘状态栏
     if (m_hStatusBar) {
-        RedrawWindow(m_hStatusBar, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+        // RedrawWindow(m_hStatusBar, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+        // ShowWindow(m_hStatusBar, SW_HIDE);
     }
+
+	// 只在非绘制模式下更新分层窗口位置（避免频繁重建 DIB）
+	if (!mIsDrawGame && m_hPixelOverlay) {
+		UpdatePixelOverlayPosition();
+		UpdatePixelOverlayFromDrawGrid();
+	}
 }
 
 LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
@@ -1746,10 +1753,11 @@ void snake::Application::UpdatePixelOverlayPosition() {
     }
 
     // 调整窗口位置和客户区大小（从客户区顶部开始，高度不包括状态栏）
+    // 使用 SWP_NOREDRAW 避免闪烁，稍后由 UpdatePixelOverlayFromDrawGrid 触发重绘
     SetWindowPos(m_hPixelOverlay, HWND_TOPMOST,
                  rcClient.left, rcClient.top,
                  clientWidth, overlayHeight,
-                 SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                 SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOREDRAW);
 }
 
 // 绘制像素数据到分层窗口（调用 DrawGrid 绘制）
