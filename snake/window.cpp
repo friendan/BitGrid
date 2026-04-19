@@ -153,11 +153,27 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 	case WM_LBUTTONDBLCLK:{ // 鼠标左键双击消息（双击客户区触发）
 		// AppUtil::SaveLog("WM_LBUTTONDBLCLK mIsDrawGrid ", This->mIsDrawGrid);
 		if(This->mIsDrawGrid){
+			// 临时设置为 false，避免 UpdatePixelOverlayPosition 中显示窗口
+			bool wasDrawGrid = This->mIsDrawGrid;
+			This->mIsDrawGrid = false;
+			
+			// 隐藏分层窗口，避免遮挡文件选择对话框
+			if (This->m_hPixelOverlay) {
+				ShowWindow(This->m_hPixelOverlay, SW_HIDE);
+			}
+			
 			std::string hexStr = AppUtil::GetFileDrawHexString(hwnd);
 			// AppUtil::SaveLog("hexStr.size() ", hexStr.size());
 			if(hexStr.size() > 0){
 				DrawGrid::Inst()->SetHexString(hexStr);
 				::InvalidateRect(This->m_hwnd, nullptr, FALSE);
+			}
+			
+			// 文件选择完成后，恢复状态并重新显示分层窗口
+			This->mIsDrawGrid = wasDrawGrid;
+			if (This->m_hPixelOverlay && This->mIsDrawGrid) {
+				ShowWindow(This->m_hPixelOverlay, SW_SHOW);
+				This->UpdatePixelOverlayFromDrawGrid();
 			}
 		}
 		break;

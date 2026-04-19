@@ -119,7 +119,7 @@ void DrawGrid::DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t*
     BLENDFUNCTION blend = {0};
     blend.BlendOp = AC_SRC_OVER;
     blend.SourceConstantAlpha = 200;  // 使用整体透明度（与像素 Alpha 一致）调整 blend.SourceConstantAlpha 的值来控制整体透明度
-    blend.AlphaFormat = 0;  // 不使用像素级 Alpha，使用 SourceConstantAlpha
+    blend.AlphaFormat = 0;  // 不使用像素级 Alpha，使用 SourceConstantAlpha AC_SRC_ALPHA - 使用每个像素的 Alpha 通道（逐像素透明度）
 
     RECT rcWindow;
     GetWindowRect(hwndOverlay, &rcWindow);
