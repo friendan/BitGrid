@@ -1164,7 +1164,6 @@ void snake::Application::onRenderWindow() noexcept{
 		// AppUtil::SaveLog("[PixelOverlay] Entering pixel draw mode");
 		// 使用分层窗口绘制像素数据（颜色 100% 精确）
 		// DrawGrid::Inst()->DrawPixGrid(this->m_hwnd);
-		CreatePixelOverlay();
 		UpdatePixelOverlayPosition();
 		UpdatePixelOverlayFromDrawGrid();
 		UpdateDrawGridInfo();
@@ -1274,6 +1273,7 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		mIsDrawGame = true;
 		mIsDrawGrid = false;
 		mPressF6Sum = 0;
+		UpdatePixelOverlayPosition();
 		if (this->m_snakeLogic.m_sInfo.scoring.mode != Logic::SnakeInfo::modes::normal || this->m_snakeLogic.m_sInfo.scoring.paused)
 		{
 			this->restartGame();
@@ -1297,6 +1297,7 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		if(mPressF6Sum >= 14){
 			mIsDrawGame = false;
 			mIsDrawGrid = true;
+			CreatePixelOverlay();
 			this->m_snakeLogic.m_sInfo.scoring.paused = 1;
 			::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 			mPressF6Sum = 0;
@@ -1306,6 +1307,7 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 	case VK_F7:{
 		mIsDrawGame = false;
 		mIsDrawGrid = true;
+		CreatePixelOverlay();
 		this->m_snakeLogic.m_sInfo.scoring.paused = 1;
 		::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 		break;
@@ -1756,6 +1758,10 @@ void snake::Application::DestroyPixelOverlay() {
 void snake::Application::UpdatePixelOverlayPosition() {
     if (!m_hPixelOverlay || !m_hwnd) {
         return;
+    }
+    if(!mIsDrawGrid){
+    	ShowWindow(m_hPixelOverlay, SW_HIDE);
+    	return;
     }
 
     // 获取主窗口客户区在屏幕上的位置
