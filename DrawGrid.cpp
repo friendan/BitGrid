@@ -58,6 +58,28 @@ void DrawGrid::DrawInit(HWND hwnd, HDC hdc){
     }
 }
 
+// 为分层窗口初始化绘制参数
+void DrawGrid::DrawInitForDIB(int width, int height){
+    mWidth = width;
+    mHeight = height;
+
+    static int lineOffset = AppConst::BORDER_LINE_OFFSET;
+    static int lineCount = AppConst::BORDER_LINE_COUNT;
+    mDrawWidth  = mWidth  - lineOffset*2 - lineCount*2 + 1;
+    mDrawHeight = mHeight - lineOffset*2 - lineCount*2 + 1;
+
+    mPageSize = mDrawWidth*mDrawHeight / 4;
+    if(mPageSize > 0){
+        mTotalPage = mHexString.size() / mPageSize;
+        if(mHexString.size() % mPageSize != 0){
+            mTotalPage += 1;
+        }
+    }
+    if(mTotalPage < 1){
+        mTotalPage = 1;
+    }
+}
+
 void DrawGrid::DrawBorder(HWND hwnd, HDC hdc)
 {
     if (!hwnd || !hdc) return;
@@ -99,6 +121,9 @@ void DrawGrid::DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t*
     if (!hwndOverlay || !hBitmap || !pPixels || width <= 0 || height <= 0) {
         return;
     }
+
+    // 初始化绘制参数（计算 mDrawWidth, mDrawHeight, mPageSize 等）
+    DrawInitForDIB(width, height);
 
     // 先绘制边框
     DrawBorderToDIB(pPixels, width, height);
@@ -212,7 +237,15 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
 
     const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
     const static int& lineCount = AppConst::BORDER_LINE_COUNT;
-    const static uint32_t* BitColor = AppConst::BitColor;
+    
+    // DIB 使用 BGRA 格式，需要转换 BitColor
+    // BitColor[0] = 0xFF000000 (黑色 ARGB) → 0xFF000000 (BGRA: B=0, G=0, R=0, A=255)
+    // BitColor[1] = 0xFFFFFFFF (白色 ARGB) → 0xFFFFFFFF (BGRA: B=255, G=255, R=255, A=255)
+    // 对于纯黑和纯白，ARGB 和 BGRA 是一样的
+    static uint32_t BitColorBGRA[2] = {
+        ARGB(255, 0, 0, 0),     // 黑色
+        ARGB(255, 255, 255, 255) // 白色
+    };
 
     int xStart = lineOffset + lineCount;
     int yStart = lineOffset + lineCount;
@@ -227,10 +260,10 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
         AppUtil::HexCharToBits(hexChar, bits);
         
         // 直接写入像素数组
-        pPixels[y * width + x++] = BitColor[bits[0]];
-        pPixels[y * width + x++] = BitColor[bits[1]];
-        pPixels[y * width + x++] = BitColor[bits[2]];
-        pPixels[y * width + x++] = BitColor[bits[3]];
+        pPixels[y * width + x++] = BitColorBGRA[bits[0]];
+        pPixels[y * width + x++] = BitColorBGRA[bits[1]];
+        pPixels[y * width + x++] = BitColorBGRA[bits[2]];
+        pPixels[y * width + x++] = BitColorBGRA[bits[3]];
         
         // 换行检查
         if ((int)x >= xMax) {

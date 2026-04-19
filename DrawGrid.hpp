@@ -16,6 +16,9 @@ public:
 
     // 在窗口客户区绘制边界线（顶部、底部、左侧、右侧）
 	void DrawInit(HWND hwnd, HDC hdc);
+	
+	// 为分层窗口初始化绘制参数
+	void DrawInitForDIB(int width, int height);
 	void DrawBorder(HWND hwnd, HDC hdc);
 	void DrawHexString(HWND hwnd, HDC hdc);
 	void DrawPixGrid(HWND hwnd);
