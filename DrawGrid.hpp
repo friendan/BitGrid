@@ -20,6 +20,12 @@ public:
 	void DrawHexString(HWND hwnd, HDC hdc);
 	void DrawPixGrid(HWND hwnd);
 	void DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t* pPixels, int width, int height);
+	
+	// 直接在 DIB 像素数组上绘制边框（用于分层窗口）
+	void DrawBorderToDIB(uint32_t* pPixels, int width, int height);
+	
+	// 直接在 DIB 像素数组上绘制十六进制数据（用于分层窗口）
+	void DrawHexStringToDIB(uint32_t* pPixels, int width, int height);
 
 	void SetHexString(const std::string& hexString);
 	void NextPage();

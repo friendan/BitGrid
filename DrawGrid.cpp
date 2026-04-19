@@ -100,12 +100,11 @@ void DrawGrid::DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t*
         return;
     }
 
-    // 填充半透明护眼绿背景 (Alpha=128, R=199, G=237, B=204)
-    // uint32_t debugBgColor = ARGB(255, 199, 237, 204);
-    uint32_t debugBgColor = ARGB(32, 199, 237, 204);
-    for (int i = 0; i < width * height; i++) {
-        pPixels[i] = debugBgColor;
-    }
+    // 先绘制边框
+    DrawBorderToDIB(pPixels, width, height);
+    
+    // 再绘制十六进制数据
+    DrawHexStringToDIB(pPixels, width, height);
 
     // 使用 UpdateLayeredWindow 更新分层窗口
     HDC hdcScreen = GetDC(NULL);
@@ -140,6 +139,105 @@ void DrawGrid::DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t*
 
     DeleteDC(hdcMem);
     ReleaseDC(NULL, hdcScreen);
+}
+
+//=============================================================================
+// 辅助函数：直接在 DIB 像素数组上绘制边框（用于分层窗口）
+//=============================================================================
+void DrawGrid::DrawBorderToDIB(uint32_t* pPixels, int width, int height) {
+    if (!pPixels || width <= 0 || height <= 0) {
+        return;
+    }
+
+    static COLORREF cr = AppConst::BORDER_COLOR;
+    static COLORREF bkCr = AppConst::BACKGROUND_COLOR;
+    
+    // 将 COLORREF 转换为 ARGB 格式（注意：DIB 使用 BGRA 小端序）
+    uint32_t borderColor = ARGB(255, GetRValue(cr), GetGValue(cr), GetBValue(cr));
+    uint32_t backColor = ARGB(255, GetRValue(bkCr), GetGValue(bkCr), GetBValue(bkCr));
+    
+    static int lineOffset = AppConst::BORDER_LINE_OFFSET;
+    static int lineCount = AppConst::BORDER_LINE_COUNT;
+    
+    // 填充背景色
+    for (int i = 0; i < width * height; i++) {
+        pPixels[i] = backColor;
+    }
+    
+    float xStart = lineOffset;
+    float yStart = lineOffset;
+    float xMax = width - lineOffset;
+    float yMax = height - lineOffset;
+
+    // 绘制边框线条
+    for (int cnt = 0; cnt < lineCount; ++cnt) {
+        // 顶部画N条直线
+        for (int x = 0; x < width; x++) {
+            pPixels[(int)(yStart + cnt) * width + x] = borderColor;
+        }
+        // 底部画N条直线
+        for (int x = 0; x < width; x++) {
+            pPixels[(int)(yMax - cnt) * width + x] = borderColor;
+        }
+        // 左侧画N条直线
+        for (int y = 0; y < height; y++) {
+            pPixels[y * width + (int)(xStart + cnt)] = borderColor;
+        }
+        // 右侧画N条直线
+        for (int y = 0; y < height; y++) {
+            pPixels[y * width + (int)(xMax - cnt)] = borderColor;
+        }
+    }
+}
+
+//=============================================================================
+// 辅助函数：直接在 DIB 像素数组上绘制十六进制数据（用于分层窗口）
+//=============================================================================
+void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
+    if (!pPixels || width <= 0 || height <= 0) {
+        return;
+    }
+    
+    // 参数有效性检查
+    if (mPageSize < 1 || mHexString.empty()) {
+        return;
+    }
+
+    // 获取当前页的十六进制字符串
+    std::string_view hexStringView = AppUtil::GetSubStrViewByPage(mHexString, mPageSize, mCurPage);
+    if (hexStringView.empty()) {
+        return;
+    }
+
+    const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
+    const static int& lineCount = AppConst::BORDER_LINE_COUNT;
+    const static uint32_t* BitColor = AppConst::BitColor;
+
+    int xStart = lineOffset + lineCount;
+    int yStart = lineOffset + lineCount;
+    int xMax = width - lineOffset - lineCount;
+    int yMax = height - lineOffset - lineCount;
+
+    size_t x = xStart;
+    size_t y = yStart;
+    uint8_t bits[4] = {0};
+    
+    for (char hexChar : hexStringView) {
+        AppUtil::HexCharToBits(hexChar, bits);
+        
+        // 直接写入像素数组
+        pPixels[y * width + x++] = BitColor[bits[0]];
+        pPixels[y * width + x++] = BitColor[bits[1]];
+        pPixels[y * width + x++] = BitColor[bits[2]];
+        pPixels[y * width + x++] = BitColor[bits[3]];
+        
+        // 换行检查
+        if ((int)x >= xMax) {
+            x = xStart;
+            y += 1;
+            if ((int)y >= yMax) break;
+        }
+    }
 }
 
 void DrawGrid::SetHexString(const std::string& hexString){
