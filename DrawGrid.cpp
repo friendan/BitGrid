@@ -65,6 +65,7 @@ void DrawGrid::DrawInitForDIB(int width, int height){
 
     static int lineOffset = AppConst::BORDER_LINE_OFFSET;
     static int lineCount = AppConst::BORDER_LINE_COUNT;
+    // 像素数据区域宽度 = 总宽 - 左右边框偏移 - 左右边框线条数 + 1（因为边框线条只在内侧）
     mDrawWidth  = mWidth  - lineOffset*2 - lineCount*2 + 1;
     mDrawHeight = mHeight - lineOffset*2 - lineCount*2 + 1;
 
@@ -248,9 +249,9 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
 
     int xStart = lineOffset + lineCount;
     int yStart = lineOffset + lineCount;
-    // 计算绘制区域的右边界和下边界（不包括边框）
-    int xMax = width - lineOffset - lineCount;
-    int yMax = height - lineOffset - lineCount;
+    // 使用与边框绘制一致的 xMax 计算方式，减去 lineCount 避免覆盖边框
+    int xMax = width - lineOffset - lineCount + 1;   // 右边界（不含）
+    int yMax = height - lineOffset - lineCount + 1; // 下边界（不含）
 
     size_t x = xStart;
     size_t y = yStart;
@@ -259,19 +260,18 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
     for (char hexChar : hexStringView) {
         AppUtil::HexCharToBits(hexChar, bits);
         
-        // 检查当前行剩余空间是否足够写入4个像素
-        if ((int)x + 3 >= xMax) {
-            // 空间不足，换行
-            x = xStart;
-            y += 1;
-            if ((int)y >= yMax) break;
+        // 逐像素写入，到达右边界立即换行
+        for (int i = 0; i < 4; i++) {
+            // 写入前检查边界
+            if ((int)x >= xMax) {
+                x = xStart;
+                y += 1;
+                if ((int)y >= yMax) break;
+            }
+            pPixels[y * width + x++] = BitColorBGRA[bits[i]];
         }
         
-        // 直接写入像素数组
-        pPixels[y * width + x++] = BitColorBGRA[bits[0]];
-        pPixels[y * width + x++] = BitColorBGRA[bits[1]];
-        pPixels[y * width + x++] = BitColorBGRA[bits[2]];
-        pPixels[y * width + x++] = BitColorBGRA[bits[3]];
+        if ((int)y >= yMax) break;
     }
 }
 
