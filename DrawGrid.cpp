@@ -142,9 +142,8 @@ void DrawGrid::DrawPixGridToOverlay(HWND hwndOverlay, HBITMAP hBitmap, uint32_t*
     
     BLENDFUNCTION blend = {0};
     blend.BlendOp = AC_SRC_OVER;
-    blend.SourceConstantAlpha = 200;  // 使用整体透明度（与像素 Alpha 一致）
-    // blend.AlphaFormat = 0;         // 使用SourceConstantAlpha设置透明度
-    blend.AlphaFormat = AC_SRC_ALPHA;  // 不使用像素级 Alpha，使用 SourceConstantAlpha AC_SRC_ALPHA - 使用每个像素的 Alpha 通道（逐像素透明度）
+    blend.SourceConstantAlpha = 255;  // 使用整体透明度（0-255）
+    blend.AlphaFormat = 0;            // 使用 SourceConstantAlpha，不使用像素级 Alpha
 
     RECT rcWindow;
     GetWindowRect(hwndOverlay, &rcWindow);
@@ -195,22 +194,22 @@ void DrawGrid::DrawBorderToDIB(uint32_t* pPixels, int width, int height) {
     float xMax = width - lineOffset;
     float yMax = height - lineOffset;
 
-    // 绘制边框线条
+    // 绘制边框线条（注意：边框只在内侧区域绘制，不覆盖整个宽度/高度）
     for (int cnt = 0; cnt < lineCount; ++cnt) {
-        // 顶部画N条直线
-        for (int x = 0; x < width; x++) {
+        // 顶部画N条直线（从 xStart 到 xMax-1）
+        for (int x = (int)xStart; x < (int)xMax; x++) {
             pPixels[(int)(yStart + cnt) * width + x] = borderColor;
         }
         // 底部画N条直线
-        for (int x = 0; x < width; x++) {
+        for (int x = (int)xStart; x < (int)xMax; x++) {
             pPixels[(int)(yMax - cnt) * width + x] = borderColor;
         }
-        // 左侧画N条直线
-        for (int y = 0; y < height; y++) {
+        // 左侧画N条直线（从 yStart 到 yMax-1）
+        for (int y = (int)yStart; y < (int)yMax; y++) {
             pPixels[y * width + (int)(xStart + cnt)] = borderColor;
         }
         // 右侧画N条直线
-        for (int y = 0; y < height; y++) {
+        for (int y = (int)yStart; y < (int)yMax; y++) {
             pPixels[y * width + (int)(xMax - cnt)] = borderColor;
         }
     }
@@ -249,6 +248,7 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
 
     int xStart = lineOffset + lineCount;
     int yStart = lineOffset + lineCount;
+    // 计算绘制区域的右边界和下边界（不包括边框）
     int xMax = width - lineOffset - lineCount;
     int yMax = height - lineOffset - lineCount;
 
@@ -259,18 +259,19 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
     for (char hexChar : hexStringView) {
         AppUtil::HexCharToBits(hexChar, bits);
         
+        // 检查当前行剩余空间是否足够写入4个像素
+        if ((int)x + 3 >= xMax) {
+            // 空间不足，换行
+            x = xStart;
+            y += 1;
+            if ((int)y >= yMax) break;
+        }
+        
         // 直接写入像素数组
         pPixels[y * width + x++] = BitColorBGRA[bits[0]];
         pPixels[y * width + x++] = BitColorBGRA[bits[1]];
         pPixels[y * width + x++] = BitColorBGRA[bits[2]];
         pPixels[y * width + x++] = BitColorBGRA[bits[3]];
-        
-        // 换行检查
-        if ((int)x >= xMax) {
-            x = xStart;
-            y += 1;
-            if ((int)y >= yMax) break;
-        }
     }
 }
 
