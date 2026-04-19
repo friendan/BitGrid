@@ -97,7 +97,7 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 	{
 		// 结束调整大小，清除标志并强制更新
 		This->m_bIsSizing = false;
-		if (!This->mIsDrawGame && This->m_hPixelOverlay) {
+		if (This->mIsDrawGrid && This->m_hPixelOverlay) {
 			This->UpdatePixelOverlayPosition();
 			This->UpdatePixelOverlayFromDrawGrid();
 		}
@@ -119,7 +119,7 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 		This->UpdateWindowTitle();
 		
 		// 更新分层窗口位置
-		if (!This->mIsDrawGame && This->m_hPixelOverlay) {
+		if (This->mIsDrawGrid && This->m_hPixelOverlay) {
 			This->UpdatePixelOverlayPosition();
 		}
 		break;
@@ -127,7 +127,7 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 	case WM_MOVE:
 	{
 		// 窗口移动时更新分层窗口位置
-		if (!This->mIsDrawGame && This->m_hPixelOverlay) {
+		if (This->mIsDrawGrid && This->m_hPixelOverlay) {
 			This->UpdatePixelOverlayPosition();
 		}
 		break;
@@ -151,8 +151,8 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 		break;
 	}
 	case WM_LBUTTONDBLCLK:{ // 鼠标左键双击消息（双击客户区触发）
-		// AppUtil::SaveLog("WM_LBUTTONDBLCLK mIsDrawGame ", This->mIsDrawGame);
-		if(!This->mIsDrawGame){
+		// AppUtil::SaveLog("WM_LBUTTONDBLCLK mIsDrawGrid ", This->mIsDrawGrid);
+		if(This->mIsDrawGrid){
 			std::string hexStr = AppUtil::GetFileDrawHexString(hwnd);
 			// AppUtil::SaveLog("hexStr.size() ", hexStr.size());
 			if(hexStr.size() > 0){
@@ -1157,13 +1157,14 @@ void snake::Application::destroyAssets() noexcept
 }
 
 void snake::Application::onRenderWindow() noexcept{
-	CreatePixelOverlay();
 	if(mIsDrawGame){
 		onRender();
-	}else{
+	}
+	if(mIsDrawGrid){
 		// AppUtil::SaveLog("[PixelOverlay] Entering pixel draw mode");
 		// 使用分层窗口绘制像素数据（颜色 100% 精确）
 		// DrawGrid::Inst()->DrawPixGrid(this->m_hwnd);
+		CreatePixelOverlay();
 		UpdatePixelOverlayPosition();
 		UpdatePixelOverlayFromDrawGrid();
 		UpdateDrawGridInfo();
@@ -1226,7 +1227,7 @@ void snake::Application::onResize(UINT width, UINT height) noexcept
 	this->p_calcPositions();
 
 	// 拖动过程中不更新分层窗口，避免闪烁
-	if (!m_bIsSizing && !mIsDrawGame && m_hPixelOverlay) {
+	if (!m_bIsSizing && mIsDrawGrid && m_hPixelOverlay) {
 		UpdatePixelOverlayPosition();
 		UpdatePixelOverlayFromDrawGrid();
 	}
@@ -1234,7 +1235,7 @@ void snake::Application::onResize(UINT width, UINT height) noexcept
 
 LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 {	
-	if(!mIsDrawGame){
+	if(mIsDrawGrid){
 		if(wp == VK_OEM_MINUS || wp == VK_SUBTRACT){
 	        // VK_OEM_MINUS 主键盘减号
 	        // VK_SUBTRACT  小键盘减号
@@ -1271,6 +1272,7 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		break;
 	case VK_RETURN:
 		mIsDrawGame = true;
+		mIsDrawGrid = false;
 		mPressF6Sum = 0;
 		if (this->m_snakeLogic.m_sInfo.scoring.mode != Logic::SnakeInfo::modes::normal || this->m_snakeLogic.m_sInfo.scoring.paused)
 		{
@@ -1280,7 +1282,7 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		}
 		break;
 	case VK_SPACE:{ // 按空格键
-		if(!mIsDrawGame){
+		if(mIsDrawGrid){
 			DrawGrid::Inst()->NextPage();
 			::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 		}
@@ -1294,16 +1296,18 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		mPressF6Sum += 1;
 		if(mPressF6Sum >= 14){
 			mIsDrawGame = false;
+			mIsDrawGrid = true;
 			this->m_snakeLogic.m_sInfo.scoring.paused = 1;
 			::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 			mPressF6Sum = 0;
 		}
 		break;
 	}
-case VK_F7:{
-		// mIsDrawGame = false;
-		// this->m_snakeLogic.m_sInfo.scoring.paused = 1;
-		// ::InvalidateRect(this->m_hwnd, nullptr, FALSE);
+	case VK_F7:{
+		mIsDrawGame = false;
+		mIsDrawGrid = true;
+		this->m_snakeLogic.m_sInfo.scoring.paused = 1;
+		::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 		break;
 	}
 	case VK_F11:
