@@ -104,6 +104,22 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 		::InvalidateRect(This->m_hwnd, nullptr, FALSE);
 		return 0;
 	}
+	case WM_ACTIVATE:
+	{
+		// 主窗口激活状态改变时，同步处理分层窗口
+		if (LOWORD(wp) == WA_INACTIVE) {
+			// 主窗口失活（切换到其他程序），隐藏分层窗口
+			if (This->m_hPixelOverlay) {
+				ShowWindow(This->m_hPixelOverlay, SW_HIDE);
+			}
+		} else if (LOWORD(wp) != 0 && This->mIsDrawGrid) {
+			// 主窗口激活，显示分层窗口
+			if (This->m_hPixelOverlay) {
+				ShowWindow(This->m_hPixelOverlay, SW_SHOW);
+			}
+		}
+		break;
+	}
 	case WM_SIZE:
 	{
 		// 先让系统给状态栏排版
@@ -1735,14 +1751,14 @@ bool snake::Application::CreatePixelOverlay() {
     // 如果窗口类已注册，RegisterClassExW 会失败，但这没关系
     RegisterClassExW(&wcex);
     
-    // 创建真正的分层窗口
+    // 创建真正的分层窗口（独立弹出窗口，通过 WM_ACTIVATE 控制显示）
     m_hPixelOverlay = CreateWindowExW(
-        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,  // 分层 + 顶层 + 透明 + 不激活
+        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,  // 分层 + 透明 + 不激活
         L"PixelOverlayWindowClass",     // 自定义窗口类
         L"PixelOverlay",                // 窗口标题
         WS_POPUP | WS_VISIBLE,          // 弹出窗口 + 可见
         0, 0, m_overlayWidth, m_overlayHeight,
-        NULL,                           // 无父窗口（避免父子关系导致的问题）
+        NULL,                           // 无父窗口
         NULL,                           // 无菜单
         GetModuleHandleW(NULL),         // 实例句柄
         NULL                            // 无额外参数
@@ -1780,7 +1796,7 @@ void snake::Application::UpdatePixelOverlayPosition() {
     	return;
     }
 
-    // 获取主窗口客户区在屏幕上的位置
+    // 获取主窗口客户区在屏幕上的位置（独立窗口使用屏幕坐标）
     RECT rcClient;
     GetClientRect(m_hwnd, &rcClient);
     ClientToScreen(m_hwnd, (LPPOINT)&rcClient.left);
@@ -1830,9 +1846,10 @@ void snake::Application::UpdatePixelOverlayPosition() {
         }
     }
 
-    // 调整窗口位置和客户区大小（从客户区顶部开始，高度不包括状态栏）
+    // 调整窗口位置（使用屏幕坐标）
+    // 使用 HWND_TOP 让分层窗口在主窗口之上，但不是全局置顶
     // 使用 SWP_NOREDRAW 避免闪烁，稍后由 UpdatePixelOverlayFromDrawGrid 触发重绘
-    SetWindowPos(m_hPixelOverlay, HWND_TOPMOST,
+    SetWindowPos(m_hPixelOverlay, HWND_TOP,
                  rcClient.left, rcClient.top,
                  clientWidth, overlayHeight,
                  SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOREDRAW);
