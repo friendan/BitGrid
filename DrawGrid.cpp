@@ -221,17 +221,23 @@ void DrawGrid::DrawBorderToDIB(uint32_t* pPixels, int width, int height) {
 //=============================================================================
 void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
     if (!pPixels || width <= 0 || height <= 0) {
+        AppUtil::SaveLog("[DrawHexStringToDIB] ERROR: Invalid parameters - pPixels=", pPixels ? "valid" : "null", 
+                         " width=", std::to_string(width), " height=", std::to_string(height));
         return;
     }
     
     // 参数有效性检查
     if (mPageSize < 1 || mHexString.empty()) {
+        AppUtil::SaveLog("[DrawHexStringToDIB] ERROR: Invalid state - mPageSize=", std::to_string(mPageSize), 
+                         " mHexString.size()=", std::to_string(mHexString.size()));
         return;
     }
 
     // 获取当前页的十六进制字符串
     std::string_view hexStringView = AppUtil::GetSubStrViewByPage(mHexString, mPageSize, mCurPage);
     if (hexStringView.empty()) {
+        AppUtil::SaveLog("[DrawHexStringToDIB] WARNING: hexStringView is empty - mPageSize=", std::to_string(mPageSize),
+                         " mCurPage=", std::to_string(mCurPage), " mTotalPage=", std::to_string(mTotalPage));
         return;
     }
 
@@ -253,9 +259,30 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
     int xMax = width - lineOffset - lineCount + 1;   // 右边界（不含）
     int yMax = height - lineOffset - lineCount + 1; // 下边界（不含）
 
+    // 记录关键参数用于调试
+    int drawWidth = xMax - xStart;
+    int drawHeight = yMax - yStart;
+    int totalPixels = drawWidth * drawHeight;
+    int expectedHexChars = (totalPixels + 3) / 4;  // 向上取整
+    
+    AppUtil::SaveLog("[DrawHexStringToDIB] === Drawing Info ===");
+    AppUtil::SaveLog("  Canvas: width=", std::to_string(width), " height=", std::to_string(height));
+    AppUtil::SaveLog("  DrawArea: xStart=", std::to_string(xStart), " yStart=", std::to_string(yStart),
+                     " xMax=", std::to_string(xMax), " yMax=", std::to_string(yMax),
+                     " drawWidth=", std::to_string(drawWidth), " drawHeight=", std::to_string(drawHeight));
+    AppUtil::SaveLog("  Pixels: totalPixels=", std::to_string(totalPixels), " expectedHexChars=", std::to_string(expectedHexChars));
+    AppUtil::SaveLog("  Data: mHexString.size()=", std::to_string(mHexString.size()),
+                     " mPageSize=", std::to_string(mPageSize),
+                     " mCurPage=", std::to_string(mCurPage),
+                     " mTotalPage=", std::to_string(mTotalPage));
+    AppUtil::SaveLog("  Current: hexStringView.size()=", std::to_string(hexStringView.size()),
+                     " actualPixels=", std::to_string(hexStringView.size() * 4));
+    AppUtil::SaveLog("  Match: ", (hexStringView.size() == (size_t)mPageSize) ? "OK" : "MISMATCH!");
+
     size_t x = xStart;
     size_t y = yStart;
     uint8_t bits[4] = {0};
+    size_t pixelsDrawn = 0;
     
     for (char hexChar : hexStringView) {
         AppUtil::HexCharToBits(hexChar, bits);
@@ -270,14 +297,20 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
             
             // 检查是否超出下边界（理论上不应该触发，防御性编程）
             if ((int)y >= yMax) {
-                AppUtil::SaveLog("[DrawGrid] WARNING: Drawing area overflow at y=", std::to_string(y), " yMax=", std::to_string(yMax));
+                AppUtil::SaveLog("[DrawHexStringToDIB] ERROR: Drawing area overflow! y=", std::to_string(y), 
+                                 " yMax=", std::to_string(yMax), " pixelsDrawn=", std::to_string(pixelsDrawn),
+                                 " remainingChars=", std::to_string(hexStringView.size() - (&hexChar - hexStringView.data())));
                 return;
             }
             
             // 写入像素
             pPixels[y * width + x++] = BitColorBGRA[bits[i]];
+            pixelsDrawn++;
         }
     }
+    
+    AppUtil::SaveLog("[DrawHexStringToDIB] Completed: pixelsDrawn=", std::to_string(pixelsDrawn),
+                     " finalX=", std::to_string(x), " finalY=", std::to_string(y));
 }
 
 void DrawGrid::SetHexString(const std::string& hexString){
