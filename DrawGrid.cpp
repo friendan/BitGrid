@@ -46,15 +46,23 @@ void DrawGrid::DrawInit(HWND hwnd, HDC hdc){
     mDrawWidth  = mWidth  - lineOffset*2 - lineCount*2 + 1;
     mDrawHeight = mHeight - lineOffset*2 - lineCount*2 + 1;
 
-    mPageSize = mDrawWidth*mDrawHeight / 4;
-    if(mPageSize > 0){
-        mTotalPage = mHexString.size() / mPageSize;
-        if(mHexString.size() % mPageSize != 0){
-            mTotalPage += 1;
+    // 只有在有数据时才计算 mPageSize，避免空数据时产生错误值
+    if (!mHexString.empty()) {
+        mPageSize = mDrawWidth*mDrawHeight / 4;
+        if(mPageSize > 0){
+            mTotalPage = mHexString.size() / mPageSize;
+            if(mHexString.size() % mPageSize != 0){
+                mTotalPage += 1;
+            }
         }
-    }
-    if(mTotalPage < 1){
-        mTotalPage = 1;
+        if(mTotalPage < 1){
+            mTotalPage = 1;
+        }
+    } else {
+        // 没有数据时重置分页状态
+        mPageSize = 0;
+        mTotalPage = 0;
+        mCurPage = 1;
     }
 }
 
@@ -69,15 +77,23 @@ void DrawGrid::DrawInitForDIB(int width, int height){
     mDrawWidth  = mWidth  - lineOffset*2 - lineCount*2 + 1;
     mDrawHeight = mHeight - lineOffset*2 - lineCount*2 + 1;
 
-    mPageSize = mDrawWidth*mDrawHeight / 4;
-    if(mPageSize > 0){
-        mTotalPage = mHexString.size() / mPageSize;
-        if(mHexString.size() % mPageSize != 0){
-            mTotalPage += 1;
+    // 只有在有数据时才计算 mPageSize，避免空数据时产生错误值
+    if (!mHexString.empty()) {
+        mPageSize = mDrawWidth*mDrawHeight / 4;
+        if(mPageSize > 0){
+            mTotalPage = mHexString.size() / mPageSize;
+            if(mHexString.size() % mPageSize != 0){
+                mTotalPage += 1;
+            }
         }
-    }
-    if(mTotalPage < 1){
-        mTotalPage = 1;
+        if(mTotalPage < 1){
+            mTotalPage = 1;
+        }
+    } else {
+        // 没有数据时重置分页状态
+        mPageSize = 0;
+        mTotalPage = 0;
+        mCurPage = 1;
     }
 }
 
