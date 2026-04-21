@@ -1,7 +1,10 @@
 #include "ScreenCapture.hpp"
+#include "AppUtil.hpp"
 
 #include <gdiplus.h>
 #include <string>
+
+#pragma comment(lib, "gdiplus.lib")
 
 using namespace Gdiplus;
 
@@ -29,9 +32,9 @@ static int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
     return -1;
 }
 
+// 屏幕截图 需要支持多显示器
 bool ScreenCapture::CaptureRectToPng(const RECT& rcScreen, const std::wstring& outPngPath, std::wstring* errMsg)
 {
-    // TODO 使用内存 DC 截图?
     int w = rcScreen.right - rcScreen.left;
     int h = rcScreen.bottom - rcScreen.top;
     if (w <= 0 || h <= 0) {
@@ -39,54 +42,40 @@ bool ScreenCapture::CaptureRectToPng(const RECT& rcScreen, const std::wstring& o
         return false;
     }
 
+    // 使用 BitBlt 从桌面截图（DWM 已合成所有窗口，包括分层窗口）
     HDC hdcScreen = GetDC(nullptr);
-    if (!hdcScreen) {
-        if (errMsg) *errMsg = L"GetDC(NULL) failed";
-        return false;
-    }
-
     HDC hdcMem = CreateCompatibleDC(hdcScreen);
-    if (!hdcMem) {
-        ReleaseDC(nullptr, hdcScreen);
-        if (errMsg) *errMsg = L"CreateCompatibleDC failed";
-        return false;
-    }
-
-    HBITMAP hbmp = CreateCompatibleBitmap(hdcScreen, w, h);
-    if (!hbmp) {
-        DeleteDC(hdcMem);
-        ReleaseDC(nullptr, hdcScreen);
-        if (errMsg) *errMsg = L"CreateCompatibleBitmap failed";
-        return false;
-    }
-
-    HGDIOBJ old = SelectObject(hdcMem, hbmp);
-    BOOL ok = BitBlt(hdcMem, 0, 0, w, h, hdcScreen, rcScreen.left, rcScreen.top, SRCCOPY | CAPTUREBLT);
-    SelectObject(hdcMem, old);
-
-    DeleteDC(hdcMem);
-    ReleaseDC(nullptr, hdcScreen);
-
-    if (!ok) {
-        DeleteObject(hbmp);
-        if (errMsg) *errMsg = L"BitBlt failed";
-        return false;
-    }
-
-    Bitmap bmp(hbmp, nullptr);
-    DeleteObject(hbmp);
-
+    HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, w, h);
+    HGDIOBJ hOld = SelectObject(hdcMem, hBitmap);
+    
+    // 注意：不使用 CAPTUREBLT（分层窗口会导致失真）
+    // DWM 已经合成所有窗口到桌面，直接 BitBlt 即可
+    BOOL result = BitBlt(hdcMem, 0, 0, w, h, hdcScreen, rcScreen.left, rcScreen.top, SRCCOPY);
+    
+    SelectObject(hdcMem, hOld);
+    
+    // 转换为 GDI+ Bitmap 并保存为 PNG
+    Bitmap bmp(hBitmap, nullptr);
+    
+    // 获取 PNG 编码器
     CLSID clsid{};
     if (GetEncoderClsid(L"image/png", &clsid) < 0) {
+        DeleteObject(hBitmap);
+        DeleteDC(hdcMem);
+        ReleaseDC(nullptr, hdcScreen);
         if (errMsg) *errMsg = L"PNG encoder not found";
         return false;
     }
-
+    
     Status st = bmp.Save(outPngPath.c_str(), &clsid, nullptr);
+    
+    DeleteObject(hBitmap);
+    DeleteDC(hdcMem);
+    ReleaseDC(nullptr, hdcScreen);
+    
     if (st != Ok) {
-        if (errMsg) *errMsg = L"GDI+ Save failed, status=" + std::to_wstring((int)st);
+        if (errMsg) *errMsg = L"GDI+ Save failed";
         return false;
     }
     return true;
 }
-

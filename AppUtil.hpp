@@ -3,6 +3,7 @@
 #include <cstdint>  // 必须包含，用于uint8_t
 #include <string>
 #include <string_view>
+#include <sstream>
 
 class AppUtil
 {
