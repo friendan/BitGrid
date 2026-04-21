@@ -1866,6 +1866,29 @@ void snake::Application::UpdatePixelOverlayFromDrawGrid() {
         return;
     }
 
+    // 检查是否需要重新绘制（避免重复调用）
+    static int lastWidth = 0;
+    static int lastHeight = 0;
+    static size_t lastHexSize = 0;
+    static int lastCurPage = 0;
+    
+    int curWidth = m_overlayWidth;
+    int curHeight = m_overlayHeight;
+    size_t curHexSize = DrawGrid::Inst()->GetHexString().size();
+    int curCurPage = DrawGrid::Inst()->GetCurPage();
+    
+    // 如果尺寸、数据或页码没有变化，跳过重绘
+    if (curWidth == lastWidth && curHeight == lastHeight && 
+        curHexSize == lastHexSize && curCurPage == lastCurPage) {
+        return;
+    }
+    
+    // 更新缓存
+    lastWidth = curWidth;
+    lastHeight = curHeight;
+    lastHexSize = curHexSize;
+    lastCurPage = curCurPage;
+
     DrawGrid::Inst()->DrawPixGridToOverlay(
         m_hPixelOverlay, 
         m_hOverlayBitmap, 

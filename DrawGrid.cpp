@@ -645,7 +645,8 @@ COLORREF DrawGrid::ColorToRGB(const Gdiplus::Color& color){
 //=============================================================================
 std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath, 
                                         std::string* outFileName,
-                                        std::string* outFileContentHex)
+                                        std::string* outFileContentHex,
+                                        bool isFirstPage)
 {
     std::string result;
     
@@ -655,6 +656,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     
     AppUtil::SaveLog("[RestoreFromImage] Start");
     AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
+    AppUtil::SaveLog("[RestoreFromImage] isFirstPage: ", isFirstPage ? "true" : "false");
     
     // 加载图片
     Gdiplus::Bitmap* bitmap = Gdiplus::Bitmap::FromFile(imagePath.c_str());
@@ -763,24 +765,30 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
 
-    // 文件名正好是256字节 = 512个十六进制字符
-    if(result.size() < 512){
-        return "";
+    // 只有第一页包含文件名信息（前512个十六进制字符 = 256字节）
+    std::string fileContentHex = result;
+    if (isFirstPage && result.size() >= 512) {
+        std::string fileNameHex = result.substr(0, 512);
+        std::string fileName = AppUtil::HexStrToStr(fileNameHex);
+        size_t realNameEnd = fileName.find_last_not_of('\0'); // 找到最后一个不是null的字符
+        if (realNameEnd != std::string::npos) {
+            fileName = fileName.substr(0, realNameEnd + 1);
+        }
+        fileContentHex = result.substr(512); // 去掉文件名部分
+        
+        AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
+        AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
+        
+        // 通过输出参数返回解析结果
+        if (outFileName) {
+            *outFileName = fileName;
+        }
+    } else if (!isFirstPage) {
+        // 非第一页：所有数据都是文件内容
+        AppUtil::SaveLog("[RestoreFromImage] Non-first page, all data is file content");
+        AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
     }
-    std::string fileNameHex = result.substr(0, 512);
-    std::string fileName = AppUtil::HexStrToStr(fileNameHex);
-    size_t realNameEnd = fileName.find_last_not_of('0'); // 找到最后一个不是'0'的字符的下标
-    if (realNameEnd != std::string::npos) {
-        fileName = fileName.substr(0, realNameEnd + 1); // 去掉末尾的填充'0'字符（不是null字符）
-    }
-    std::string fileContentHex = result.substr(512);
-    AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
-    AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
-
-    // 通过输出参数返回解析结果
-    if (outFileName) {
-        *outFileName = fileName;
-    }
+    
     if (outFileContentHex) {
         *outFileContentHex = fileContentHex;
     }
@@ -868,13 +876,14 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
         
         std::string pageFileName;
         std::string pageFileContentHex;
-        std::string pageData = RestoreFromImage(files[i].path, &pageFileName, &pageFileContentHex);
+        bool isFirst = (i == 0);
+        std::string pageData = RestoreFromImage(files[i].path, &pageFileName, &pageFileContentHex, isFirst);
         
         result += pageData;
         allFileContentHex += pageFileContentHex;
         
         // 第一页包含文件名信息
-        if (i == 0 && outFileName && !pageFileName.empty()) {
+        if (isFirst && outFileName && !pageFileName.empty()) {
             *outFileName = pageFileName;
         }
     }
