@@ -31,6 +31,7 @@ public:
 	void DrawHexStringToDIB(uint32_t* pPixels, int width, int height);
 
 	void SetHexString(const std::string& hexString);
+	const std::string& GetHexString() const { return mHexString; }
 	void NextPage();
 	void ChangePage(int chVal);
 	

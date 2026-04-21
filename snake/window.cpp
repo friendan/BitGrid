@@ -1861,6 +1861,11 @@ void snake::Application::UpdatePixelOverlayFromDrawGrid() {
         return;
     }
 
+    // 只有在有数据时才绘制，避免空数据时的无效调用
+    if (DrawGrid::Inst()->GetHexString().empty()) {
+        return;
+    }
+
     DrawGrid::Inst()->DrawPixGridToOverlay(
         m_hPixelOverlay, 
         m_hOverlayBitmap, 
