@@ -770,7 +770,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     if (isFirstPage && result.size() >= 512) {
         std::string fileNameHex = result.substr(0, 512);
         std::string fileName = AppUtil::HexStrToStr(fileNameHex);
-        size_t realNameEnd = fileName.find_last_not_of('\0'); // 找到最后一个不是null的字符
+        size_t realNameEnd = fileName.find_last_not_of('0'); // 找到最后一个不是null的字符
         if (realNameEnd != std::string::npos) {
             fileName = fileName.substr(0, realNameEnd + 1);
         }
