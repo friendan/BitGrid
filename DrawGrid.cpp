@@ -260,18 +260,23 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
     for (char hexChar : hexStringView) {
         AppUtil::HexCharToBits(hexChar, bits);
         
-        // 逐像素写入，到达右边界立即换行
+        // 确保当前字符的 4 个 bits 都被处理
         for (int i = 0; i < 4; i++) {
-            // 写入前检查边界
+            // 每次写入前检查是否需要换行
             if ((int)x >= xMax) {
                 x = xStart;
                 y += 1;
-                if ((int)y >= yMax) break;
             }
+            
+            // 检查是否超出下边界（理论上不应该触发，防御性编程）
+            if ((int)y >= yMax) {
+                AppUtil::SaveLog("[DrawGrid] WARNING: Drawing area overflow at y=", std::to_string(y), " yMax=", std::to_string(yMax));
+                return;
+            }
+            
+            // 写入像素
             pPixels[y * width + x++] = BitColorBGRA[bits[i]];
         }
-        
-        if ((int)y >= yMax) break;
     }
 }
 
