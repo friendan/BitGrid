@@ -20,33 +20,6 @@
 
 using namespace ezui;
 
-// 日志文件
-std::wofstream g_logFile;
-
-void InitLog() {
-    g_logFile.open("debug.log", std::ios::out | std::ios::trunc);
-    g_logFile << L"=== BitGrid Debug Log Started ===" << std::endl;
-}
-
-void Log(const std::wstring& msg) {
-    if (g_logFile.is_open()) {
-        time_t now = time(0);
-        tm ltm;
-        localtime_s(&ltm, &now);
-        wchar_t timeStr[32];
-        swprintf_s(timeStr, L"[%02d:%02d:%02d] ", ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
-        g_logFile << timeStr << msg << std::endl;
-        g_logFile.flush();
-    }
-}
-
-void CloseLog() {
-    if (g_logFile.is_open()) {
-        g_logFile << L"=== Log Ended ===" << std::endl;
-        g_logFile.close();
-    }
-}
-
 class MainFrm : public Window {
 private:
     UIManager ui;
@@ -60,85 +33,85 @@ private:
     
 public:
     MainFrm(int width, int height) : Window(width, height) {
-        Log(L"MainFrm constructor started");
+        AppUtil::SaveLog("[BitGrid] MainFrm constructor started");
         Init();
-        Log(L"MainFrm constructor completed");
+        AppUtil::SaveLog("[BitGrid] MainFrm constructor completed");
     }
     
     void Init() {
-        Log(L"Init() started");
+        AppUtil::SaveLog("[BitGrid] Init() started");
         this->SetText(L"BitGrid");
-        Log(L"Window title set");
+        AppUtil::SaveLog("[BitGrid] Window title set");
         
         // 从RC资源加载布局
         std::wstring xmlContent;
-        Log(L"Trying RC resource...");
+        AppUtil::SaveLog("[BitGrid] Trying RC resource...");
         
         HRSRC hRsrc = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_MAIN_LAYOUT), RT_HTML);
-        Log(L"FindResourceW RT_HTML result: " + std::to_wstring((ULONG_PTR)hRsrc));
+        AppUtil::SaveLog("[BitGrid] FindResourceW RT_HTML result: ", std::to_string((ULONG_PTR)hRsrc));
         
         if (!hRsrc) {
             hRsrc = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_MAIN_LAYOUT), L"HTML");
-            Log(L"FindResourceW L\"HTML\" result: " + std::to_wstring((ULONG_PTR)hRsrc));
+            AppUtil::SaveLog("[BitGrid] FindResourceW L\"HTML\" result: ", std::to_string((ULONG_PTR)hRsrc));
         }
         
         if (hRsrc) {
             HGLOBAL hGlobal = LoadResource(NULL, hRsrc);
-            Log(L"LoadResource result: " + std::to_wstring((ULONG_PTR)hGlobal));
+            AppUtil::SaveLog("[BitGrid] LoadResource result: ", std::to_string((ULONG_PTR)hGlobal));
             if (hGlobal) {
                 DWORD size = SizeofResource(NULL, hRsrc);
-                Log(L"Resource size: " + std::to_wstring(size));
+                AppUtil::SaveLog("[BitGrid] Resource size: ", std::to_string(size));
                 const char* xmlData = (const char*)LockResource(hGlobal);
                 if (xmlData && size > 0) {
-                    Log(L"Resource locked, converting to wide string");
+                    AppUtil::SaveLog("[BitGrid] Resource locked, converting to wide string");
                     int wideLen = MultiByteToWideChar(CP_UTF8, 0, xmlData, size, NULL, 0);
-                    Log(L"Wide char length: " + std::to_wstring(wideLen));
+                    AppUtil::SaveLog("[BitGrid] Wide char length: ", std::to_string(wideLen));
                     if (wideLen > 0) {
                         xmlContent.resize(wideLen);
                         MultiByteToWideChar(CP_UTF8, 0, xmlData, size, &xmlContent[0], wideLen);
-                        Log(L"Loaded from RC resource successfully");
+                        AppUtil::SaveLog("[BitGrid] Loaded from RC resource successfully");
                     }
                 }
             }
         }
         
-        Log(L"XML content size: " + std::to_wstring(xmlContent.size()));
+        AppUtil::SaveLog("[BitGrid] XML content size: ", std::to_string(xmlContent.size()));
         if (!xmlContent.empty()) {
-            Log(L"Calling LoadXmlData...");
+            AppUtil::SaveLog("[BitGrid] Calling LoadXmlData...");
             ui.LoadXmlData(xmlContent.c_str());
-            Log(L"LoadXmlData completed");
+            AppUtil::SaveLog("[BitGrid] LoadXmlData completed");
         }
         else {
-            Log(L"ERROR: XML content is empty!");
+            AppUtil::SaveLog("[BitGrid] ERROR: XML content is empty!");
         }
         
-        Log(L"Calling SetupUI...");
+        AppUtil::SaveLog("[BitGrid] Calling SetupUI...");
         ui.SetupUI(this);
-        Log(L"SetupUI completed");
+        AppUtil::SaveLog("[BitGrid] SetupUI completed");
         
-        Log(L"Getting control references...");
+        AppUtil::SaveLog("[BitGrid] Getting control references...");
         logList = (VListView*)this->FindControl("logList");
         statusLeft = (Label*)this->FindControl("statusLeft");
         statusCenter = (Label*)this->FindControl("statusCenter");
         statusRight = (Label*)this->FindControl("statusRight");
         
-        Log(L"logList: " + std::to_wstring((ULONG_PTR)logList));
-        Log(L"statusLeft: " + std::to_wstring((ULONG_PTR)statusLeft));
-        Log(L"statusCenter: " + std::to_wstring((ULONG_PTR)statusCenter));
-        Log(L"statusRight: " + std::to_wstring((ULONG_PTR)statusRight));
+        AppUtil::SaveLog("[BitGrid] logList: ", std::to_string((ULONG_PTR)logList));
+        AppUtil::SaveLog("[BitGrid] statusLeft: ", std::to_string((ULONG_PTR)statusLeft));
+        AppUtil::SaveLog("[BitGrid] statusCenter: ", std::to_string((ULONG_PTR)statusCenter));
+        AppUtil::SaveLog("[BitGrid] statusRight: ", std::to_string((ULONG_PTR)statusRight));
         
-        Log(L"Adding startup log...");
+        AppUtil::SaveLog("[BitGrid] Adding startup log...");
         AddLog(L"ready...");
         
-        Log(L"Updating status bar...");
+        AppUtil::SaveLog("[BitGrid] Updating status bar...");
         UpdateStatus(L"就绪", L"", L"");
         
-        Log(L"Init() completed");
+        AppUtil::SaveLog("[BitGrid] Init() completed");
     }
     
     void AddLog(const std::wstring& message) {
-        // 同时写入日志文件
-        Log(message);
+        // 使用 AppUtil::SaveLog 统一记录日志
+        AppUtil::SaveLog("[BitGrid UI] ", AppUtil::WStrToStr(message));
         
         if (logList) {
             // 获取当前时间
@@ -195,7 +168,7 @@ public:
             }
             else if (sender->Name == "btnShot") {
                 if (!hasSelection) {
-                    AddLog(L"[WARN] 请先点击“选择”框选区域");
+                    AddLog(L"[WARN] 请先点击\"选择\"框选区域");
                     return true;
                 }
                 std::wstring dir = PathUtil::GetTodayFolderPath();
@@ -263,12 +236,11 @@ public:
 
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
-    InitLog();
-    Log(L"=== Program Started ===");
+    AppUtil::SaveLog("=== BitGrid Program Started ===");
     
     // 初始化GDI+
     DrawGrid::Inst()->InitGdiPlus();
-    Log(L"GDI+ initialized");
+    AppUtil::SaveLog("[BitGrid] GDI+ initialized");
     
     Application app;
     app.EnableHighDpi();
@@ -281,8 +253,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
     
     // 卸载GDI+
     DrawGrid::Inst()->UninitGdiPlus();
-    Log(L"GDI+ shutdown");
+    AppUtil::SaveLog("[BitGrid] GDI+ shutdown");
     
-    CloseLog();
     return result;
 }
