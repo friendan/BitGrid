@@ -19,3 +19,6 @@ DIB 像素数据 → UpdateLayeredWindow → DWM 合成 → 屏幕
 ✅ 支持透明叠加（可以看到下层窗口）
 ✅ 跟随窗口移动（自动更新位置）
 
+https://github.com/forrestchang/andrej-karpathy-skills
+
+
