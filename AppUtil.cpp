@@ -201,9 +201,32 @@ std::string AppUtil::GetTimeStr(){
 }
 
 static std::mutex g_log_mutex;
+static std::string g_log_filename;
+
+// 获取日志文件名（基于exe文件名）
+static std::string get_log_filename() {
+    if (!g_log_filename.empty()) {
+        return g_log_filename;
+    }
+    
+    // 获取exe路径
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    
+    // 提取exe文件名（不含扩展名）
+    std::wstring wExePath(exePath);
+    std::wstring wFileName = wExePath.substr(wExePath.find_last_of(L"/\\") + 1);
+    std::wstring wNameWithoutExt = wFileName.substr(0, wFileName.find_last_of(L"."));
+    
+    // 转换为窄字符并添加.log扩展名
+    g_log_filename = AppUtil::WStrToStr(wNameWithoutExt) + ".log";
+    return g_log_filename;
+}
+
 void write_log(const std::string& msg) {
     std::lock_guard<std::mutex> lock(g_log_mutex); // 自动加锁/解锁
-    std::ofstream log_file("app.log", std::ios::app | std::ios::out);
+    std::string log_file_name = get_log_filename();
+    std::ofstream log_file(log_file_name, std::ios::app | std::ios::out);
     if (log_file.is_open()) {
         log_file << AppUtil::GetTimeStr() << " " << msg << std::endl;
         log_file.close();
