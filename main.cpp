@@ -245,6 +245,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
     app.EnableHighDpi();
     
     MainFrm frm(900, 600);
+    frm.SetIcon(IDI_APP_ICON);  // 设置窗口图标
     frm.CenterToScreen();
     frm.Show();
     
