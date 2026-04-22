@@ -23,7 +23,7 @@ using namespace ezui;
 class MainFrm : public Window {
 private:
     UIManager ui;
-    VListView* logList = nullptr;
+    TextBox* logBox = nullptr;  // 使用 TextBox，支持文本选择和复制
     Label* statusLeft = nullptr;
     Label* statusCenter = nullptr;
     Label* statusRight = nullptr;
@@ -90,15 +90,19 @@ public:
         AppUtil::SaveLog("[BitGrid] SetupUI completed");
         
         AppUtil::SaveLog("[BitGrid] Getting control references...");
-        logList = (VListView*)this->FindControl("logList");
+        logBox = (TextBox*)this->FindControl("logBox");
         statusLeft = (Label*)this->FindControl("statusLeft");
         statusCenter = (Label*)this->FindControl("statusCenter");
         statusRight = (Label*)this->FindControl("statusRight");
         
-        AppUtil::SaveLog("[BitGrid] logList: ", std::to_string((ULONG_PTR)logList));
+        AppUtil::SaveLog("[BitGrid] logBox: ", std::to_string((ULONG_PTR)logBox));
         AppUtil::SaveLog("[BitGrid] statusLeft: ", std::to_string((ULONG_PTR)statusLeft));
         AppUtil::SaveLog("[BitGrid] statusCenter: ", std::to_string((ULONG_PTR)statusCenter));
         AppUtil::SaveLog("[BitGrid] statusRight: ", std::to_string((ULONG_PTR)statusRight));
+        
+        if (logBox) {
+            logBox->Style.FontSize = 12;
+        }
         
         AppUtil::SaveLog("[BitGrid] Adding startup log...");
         AddLog(L"ready...");
@@ -113,7 +117,7 @@ public:
         // 使用 AppUtil::SaveLog 统一记录日志
         AppUtil::SaveLog("[BitGrid UI] ", AppUtil::WStrToStr(message));
         
-        if (logList) {
+        if (logBox) {
             // 获取当前时间
             time_t now = time(0);
             tm ltm;
@@ -124,22 +128,17 @@ public:
                 ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
             
             // 组合时间戳和消息
-            std::wstring fullMessage = std::wstring(timeStr) + L" " + message;
+            std::wstring fullMessage = std::wstring(timeStr) + L" " + message + L"\r\n";
             
-            Label* logItem = new Label();
-            logItem->SetText(fullMessage);
-            logItem->SetFixedHeight(20);
-            logItem->Style.FontSize = 12;
-            logItem->TextAlign = TextAlign::TopLeft;  // 左对齐
-            logList->Add(logItem);
-            logList->Invalidate();
+            // 获取当前文本并追加新日志
+            std::wstring currentText = AppUtil::StrToWStr(logBox->GetText().c_str());
+            logBox->SetText((currentText + fullMessage).c_str());
         }
     }
     
     void ClearLog() {
-        if (logList) {
-            logList->Clear(true);
-            logList->Invalidate();
+        if (logBox) {
+            logBox->SetText(L"");
         }
     }
     
