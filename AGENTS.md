@@ -131,3 +131,5 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 ### demo目录说明
 1. 这是使用ezui库编写程序的例子代码，可以参考，从而掌握如何使用ezui库
+
+### 每次改完代码后 要编译项目且没有编译报错才算修改成功 有报错要修正 
