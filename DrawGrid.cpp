@@ -281,19 +281,19 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
     int totalPixels = drawWidth * drawHeight;
     int expectedHexChars = (totalPixels + 3) / 4;  // 向上取整
     
-    AppUtil::SaveLog("[DrawHexStringToDIB] === Drawing Info ===");
-    AppUtil::SaveLog("  Canvas: width=", std::to_string(width), " height=", std::to_string(height));
-    AppUtil::SaveLog("  DrawArea: xStart=", std::to_string(xStart), " yStart=", std::to_string(yStart),
-                     " xMax=", std::to_string(xMax), " yMax=", std::to_string(yMax),
-                     " drawWidth=", std::to_string(drawWidth), " drawHeight=", std::to_string(drawHeight));
-    AppUtil::SaveLog("  Pixels: totalPixels=", std::to_string(totalPixels), " expectedHexChars=", std::to_string(expectedHexChars));
-    AppUtil::SaveLog("  Data: mHexString.size()=", std::to_string(mHexString.size()),
-                     " mPageSize=", std::to_string(mPageSize),
-                     " mCurPage=", std::to_string(mCurPage),
-                     " mTotalPage=", std::to_string(mTotalPage));
-    AppUtil::SaveLog("  Current: hexStringView.size()=", std::to_string(hexStringView.size()),
-                     " actualPixels=", std::to_string(hexStringView.size() * 4));
-    AppUtil::SaveLog("  Match: ", (hexStringView.size() == (size_t)mPageSize) ? "OK" : "MISMATCH!");
+    // AppUtil::SaveLog("[DrawHexStringToDIB] === Drawing Info ===");
+    // AppUtil::SaveLog("  Canvas: width=", std::to_string(width), " height=", std::to_string(height));
+    // AppUtil::SaveLog("  DrawArea: xStart=", std::to_string(xStart), " yStart=", std::to_string(yStart),
+    //                  " xMax=", std::to_string(xMax), " yMax=", std::to_string(yMax),
+    //                  " drawWidth=", std::to_string(drawWidth), " drawHeight=", std::to_string(drawHeight));
+    // AppUtil::SaveLog("  Pixels: totalPixels=", std::to_string(totalPixels), " expectedHexChars=", std::to_string(expectedHexChars));
+    // AppUtil::SaveLog("  Data: mHexString.size()=", std::to_string(mHexString.size()),
+    //                  " mPageSize=", std::to_string(mPageSize),
+    //                  " mCurPage=", std::to_string(mCurPage),
+    //                  " mTotalPage=", std::to_string(mTotalPage));
+    // AppUtil::SaveLog("  Current: hexStringView.size()=", std::to_string(hexStringView.size()),
+    //                  " actualPixels=", std::to_string(hexStringView.size() * 4));
+    // AppUtil::SaveLog("  Match: ", (hexStringView.size() == (size_t)mPageSize) ? "OK" : "MISMATCH!");
 
     size_t x = xStart;
     size_t y = yStart;
@@ -325,8 +325,8 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
         }
     }
     
-    AppUtil::SaveLog("[DrawHexStringToDIB] Completed: pixelsDrawn=", std::to_string(pixelsDrawn),
-                     " finalX=", std::to_string(x), " finalY=", std::to_string(y));
+    // AppUtil::SaveLog("[DrawHexStringToDIB] Completed: pixelsDrawn=", std::to_string(pixelsDrawn),
+    //                  " finalX=", std::to_string(x), " finalY=", std::to_string(y));
 }
 
 void DrawGrid::SetHexString(const std::string& hexString){

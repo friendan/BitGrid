@@ -333,9 +333,9 @@ std::string AppUtil::GetFileDrawHexString(HWND hParent){
     std::ostringstream oss;
     oss << nameLenHex << fileNameHexStr << contentLenHex << fileHexStr;
 
-    AppUtil::SaveLog("[GetFileDrawHexString] fileName=", fileName, 
-                     " contentLength=", std::to_string(contentLength),
-                     " totalHexSize=", std::to_string(oss.str().size()));
+    // AppUtil::SaveLog("[GetFileDrawHexString] fileName=", fileName, 
+    //                  " contentLength=", std::to_string(contentLength),
+    //                  " totalHexSize=", std::to_string(oss.str().size()));
 
     return oss.str();
 }
