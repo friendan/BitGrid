@@ -724,7 +724,9 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
 
     for (int y = yStart; y < yEnd; y++) {
         if(errorRow >= 2){
-            break; // 连续2行没有 后面肯定是没有了
+            AppUtil::SaveLog("[RestoreFromImage] Stopped at y=", std::to_string(y), 
+                " due to ", std::to_string(errorRow), " consecutive empty rows");
+            break;
         }
         for (int x = xStart; x < xEnd; x++) {
             Gdiplus::Color color;
@@ -757,10 +759,20 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     }
     
     AppUtil::SaveLog("[RestoreFromImage] Pixel processing done");
+    AppUtil::SaveLog("[RestoreFromImage] bitIndex: ", std::to_string(bitIndex));
+    
+    // 处理剩余的bits（不足4个时用0填充）
+    if (bitIndex > 0) {
+        // 用0填充到4个bit
+        AppUtil::SaveLog("[RestoreFromImage] Pixel padding");
+        while (bitIndex < 4) {
+            bits[bitIndex++] = 0;
+        }
+        result += AppUtil::BitsToHexChar(bits);
+    }
+    
     AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
     AppUtil::SaveLog("[RestoreFromImage] Result length: ", std::to_string(result.length()));
-    AppUtil::SaveLog("[RestoreFromImage] Remaining bits: ", std::to_string(bitIndex));
-    AppUtil::SaveLog("[RestoreFromImage] Result: ", result);
         
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
