@@ -839,9 +839,9 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
                            " to ", std::to_string(expectedHexLen), " hex chars");
         }
         
+        AppUtil::SaveLog("[RestoreFromImage] File name length: ", std::to_string(nameLen), " bytes");
         AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
-        AppUtil::SaveLog("[RestoreFromImage] Content length: ", std::to_string(contentLength), " bytes");
-        AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
+        AppUtil::SaveLog("[RestoreFromImage] Content length: ", std::to_string(contentLength), " bytes (", std::to_string(fileContentHex.length()), " hex chars)");
         
         // 通过输出参数返回解析结果
         if (outFileName) {
