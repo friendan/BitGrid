@@ -254,13 +254,20 @@ static std::string get_log_filename() {
     wchar_t exePath[MAX_PATH];
     GetModuleFileNameW(NULL, exePath, MAX_PATH);
     
-    // 提取exe文件名（不含扩展名）
+    // 提取exe目录
     std::wstring wExePath(exePath);
-    std::wstring wFileName = wExePath.substr(wExePath.find_last_of(L"/\\") + 1);
+    size_t lastSlash = wExePath.find_last_of(L"/\\");
+    std::wstring wExeDir = wExePath.substr(0, lastSlash + 1);
+    
+    // 提取exe文件名（不含扩展名）
+    std::wstring wFileName = wExePath.substr(lastSlash + 1);
     std::wstring wNameWithoutExt = wFileName.substr(0, wFileName.find_last_of(L"."));
     
-    // 转换为窄字符并添加.log扩展名
-    g_log_filename = AppUtil::WStrToStr(wNameWithoutExt) + ".log";
+    // 构建完整的日志文件路径：exe目录 + exe名.log
+    std::wstring wLogPath = wExeDir + wNameWithoutExt + L".log";
+    
+    // 转换为窄字符
+    g_log_filename = AppUtil::WStrToStr(wLogPath);
     return g_log_filename;
 }
 
