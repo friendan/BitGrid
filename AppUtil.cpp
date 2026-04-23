@@ -118,8 +118,16 @@ std::string AppUtil::StrToHexStr(const std::string& str){
 
 bool AppUtil::WriteHexStringToFile(const std::string& hexStr, const std::string& strFilePath)
 {
-    if (hexStr.empty() || hexStr.size() % 2 != 0) {
-        return false; // 长度必须是偶数
+    if (hexStr.empty()) {
+        return false;
+    }
+
+    // 如果长度是奇数，丢弃最后一个字符（不完整的字节）
+    std::string normalizedHex = hexStr;
+    if (normalizedHex.size() % 2 != 0) {
+        normalizedHex = hexStr.substr(0, hexStr.size() - 1);
+        SaveLog("[WriteHexStringToFile] Truncated odd-length hex string: ", 
+                std::to_string(hexStr.size()), " -> ", std::to_string(normalizedHex.size()));
     }
 
     std::ofstream file(strFilePath, std::ios::binary);
@@ -128,7 +136,7 @@ bool AppUtil::WriteHexStringToFile(const std::string& hexStr, const std::string&
     }
 
     // 预分配二进制内存（2个十六进制字符 = 1字节）
-    const size_t byteCount = hexStr.size() / 2;
+    const size_t byteCount = normalizedHex.size() / 2;
     std::string binaryData;
     binaryData.reserve(byteCount);
 
@@ -141,9 +149,9 @@ bool AppUtil::WriteHexStringToFile(const std::string& hexStr, const std::string&
     };
 
     // 每两个字符合成一个字节
-    for (size_t i = 0; i < hexStr.size(); i += 2) {
-        uint8_t high = CharToHex(hexStr[i]);
-        uint8_t low = CharToHex(hexStr[i + 1]);
+    for (size_t i = 0; i < normalizedHex.size(); i += 2) {
+        uint8_t high = CharToHex(normalizedHex[i]);
+        uint8_t low = CharToHex(normalizedHex[i + 1]);
         binaryData += (high << 4) | low;
     }
 
