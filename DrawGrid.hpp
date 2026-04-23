@@ -31,6 +31,11 @@ public:
 	void DrawHexStringToDIB(uint32_t* pPixels, int width, int height);
 
 	void SetHexString(const std::string& hexString);
+	
+	// 设置带文件名和文件长度的数据（新格式）
+	// 格式：文件名长度(4字节) + 文件名(256字节) + 文件内容长度(4字节) + 文件内容
+	void SetFileData(const std::string& fileName, const std::string& fileContentHex);
+	
 	const std::string& GetHexString() const { return mHexString; }
 	int GetCurPage() const { return mCurPage; }
 	void NextPage();

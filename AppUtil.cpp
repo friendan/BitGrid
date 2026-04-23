@@ -116,6 +116,39 @@ std::string AppUtil::StrToHexStr(const std::string& str){
     return hexString;
 }
 
+std::string AppUtil::UInt32ToHexStr(uint32_t value){
+    static const char hexTable[] = "0123456789ABCDEF";
+    std::string hexStr(8, '0');
+    
+    // 大端序：高位在前
+    for (int i = 7; i >= 0; i--) {
+        hexStr[i] = hexTable[value & 0x0F];
+        value >>= 4;
+    }
+    
+    return hexStr;
+}
+
+uint32_t AppUtil::HexStrToUInt32(const std::string& hexStr){
+    if (hexStr.size() != 8) {
+        return 0;
+    }
+    
+    auto CharToHex = [](char c) -> uint8_t {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
+        if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+        return 0;
+    };
+    
+    uint32_t value = 0;
+    for (int i = 0; i < 8; i++) {
+        value = (value << 4) | CharToHex(hexStr[i]);
+    }
+    
+    return value;
+}
+
 bool AppUtil::WriteHexStringToFile(const std::string& hexStr, const std::string& strFilePath)
 {
     if (hexStr.empty()) {
@@ -279,16 +312,23 @@ std::string AppUtil::GetFileDrawHexString(HWND hParent){
     }
 
     std::string fileName = fs::path(filePath).filename().string();
+    
+    // 新格式：文件名长度(8hex) + 文件名(512hex) + 文件内容长度(8hex) + 文件内容
+    std::string nameLenHex = AppUtil::UInt32ToHexStr(256);  // 固定256字节
+    
     std::string fileName256 = AppUtil::StringToLen256(fileName);
     std::string fileNameHexStr = AppUtil::StrToHexStr(fileName256);
+    
+    // 文件内容长度（字节数）= 十六进制字符串长度 / 2
+    uint32_t contentLength = fileHexStr.size() / 2;
+    std::string contentLenHex = AppUtil::UInt32ToHexStr(contentLength);
+    
     std::ostringstream oss;
-    oss << fileNameHexStr << fileHexStr;
+    oss << nameLenHex << fileNameHexStr << contentLenHex << fileHexStr;
 
-    // AppUtil::SaveLog("filePath ", filePath);
-    AppUtil::SaveLog("fileName ", fileName);
-    AppUtil::SaveLog("fileName256 ", fileName256);
-    AppUtil::SaveLog("fileNameHexStr ", fileNameHexStr);
-    // AppUtil::SaveLog("fileHexStr ", fileHexStr);
+    AppUtil::SaveLog("[GetFileDrawHexString] fileName=", fileName, 
+                     " contentLength=", std::to_string(contentLength),
+                     " totalHexSize=", std::to_string(oss.str().size()));
 
     return oss.str();
 }

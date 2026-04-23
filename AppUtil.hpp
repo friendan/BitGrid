@@ -50,6 +50,20 @@ public:
 
 	static std::string StrToHexStr(const std::string& str);
 	
+	/**
+	 * @brief 将uint32转换为8字符的十六进制字符串（大端序）
+	 * @param value uint32值
+	 * @return 8字符的十六进制字符串（如："00000100"）
+	 */
+	static std::string UInt32ToHexStr(uint32_t value);
+	
+	/**
+	 * @brief 将8字符的十六进制字符串转换为uint32（大端序）
+	 * @param hexStr 8字符的十六进制字符串
+	 * @return uint32值
+	 */
+	static uint32_t HexStrToUInt32(const std::string& hexStr);
+	
 	 /**
      * @brief 将十六进制字符串 → 写入二进制文件
      * @param hexStr 十六进制字符串（大写/小写均可，无空格）

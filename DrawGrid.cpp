@@ -334,6 +334,38 @@ void DrawGrid::SetHexString(const std::string& hexString){
     mCurPage = 1;
 }
 
+// 设置带文件名和文件长度的十六进制字符串
+// 格式：文件名长度(4字节) + 文件名(256字节) + 文件内容长度(4字节) + 文件内容
+void DrawGrid::SetFileData(const std::string& fileName, const std::string& fileContentHex){
+    // 确保文件名不超过256字节
+    std::string paddedName = fileName;
+    if (paddedName.size() > 256) {
+        paddedName = paddedName.substr(0, 256);
+    }
+    // 填充到256字节
+    while (paddedName.size() < 256) {
+        paddedName += '0';
+    }
+    
+    // 转换文件名为十六进制
+    std::string fileNameHex = AppUtil::StrToHexStr(paddedName);
+    
+    // 文件内容长度（字节数）= 十六进制字符串长度 / 2
+    uint32_t contentLength = fileContentHex.size() / 2;
+    
+    // 构建完整的十六进制字符串
+    // 格式：文件名长度(8个hex字符) + 文件名(512个hex字符) + 文件内容长度(8个hex字符) + 文件内容
+    std::string nameLenHex = AppUtil::UInt32ToHexStr(256);  // 固定256字节
+    std::string contentLenHex = AppUtil::UInt32ToHexStr(contentLength);
+    
+    mHexString = nameLenHex + fileNameHex + contentLenHex + fileContentHex;
+    mCurPage = 1;
+    
+    AppUtil::SaveLog("[SetFileData] fileName=", fileName, 
+                     " contentLength=", std::to_string(contentLength),
+                     " totalHexSize=", std::to_string(mHexString.size()));
+}
+
 void DrawGrid::NextPage(){
     mCurPage += 1;
     if(mCurPage > mTotalPage){
@@ -777,18 +809,38 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
 
-    // 只有第一页包含文件名信息（前512个十六进制字符 = 256字节）
+    // 解析新格式：文件名长度(8hex) + 文件名(512hex) + 文件内容长度(8hex) + 文件内容
     std::string fileContentHex = result;
-    if (isFirstPage && result.size() >= 512) {
-        std::string fileNameHex = result.substr(0, 512);
+    if (isFirstPage && result.size() >= 528) {  // 8 + 512 + 8 = 528
+        // 解析文件名长度（应该固定为256）
+        std::string nameLenHex = result.substr(0, 8);
+        uint32_t nameLen = AppUtil::HexStrToUInt32(nameLenHex);
+        
+        // 解析文件名（512个hex字符 = 256字节）
+        std::string fileNameHex = result.substr(8, 512);
         std::string fileName = AppUtil::HexStrToStr(fileNameHex);
         size_t realNameEnd = fileName.find_last_not_of('0'); // 找到最后一个不是null的字符
         if (realNameEnd != std::string::npos) {
             fileName = fileName.substr(0, realNameEnd + 1);
         }
-        fileContentHex = result.substr(512); // 去掉文件名部分
+        
+        // 解析文件内容长度
+        std::string contentLenHex = result.substr(520, 8);  // 8 + 512 = 520
+        uint32_t contentLength = AppUtil::HexStrToUInt32(contentLenHex);
+        
+        // 提取文件内容（从第528个字符开始）
+        fileContentHex = result.substr(528);
+        
+        // 根据文件内容长度截断（处理奇数长度情况）
+        size_t expectedHexLen = contentLength * 2;
+        if (fileContentHex.size() > expectedHexLen) {
+            fileContentHex = fileContentHex.substr(0, expectedHexLen);
+            AppUtil::SaveLog("[RestoreFromImage] Truncated content from ", std::to_string(result.size() - 528),
+                           " to ", std::to_string(expectedHexLen), " hex chars");
+        }
         
         AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
+        AppUtil::SaveLog("[RestoreFromImage] Content length: ", std::to_string(contentLength), " bytes");
         AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
         
         // 通过输出参数返回解析结果
