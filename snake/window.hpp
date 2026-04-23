@@ -34,6 +34,11 @@ namespace snake
 		HINSTANCE m_hInst{ nullptr };
 		LPCWSTR m_lpCmdArgs;
 		HWND m_hwnd{ nullptr };
+		
+		// 空闲检测
+		UINT_PTR m_idleTimerId{ 0 };           // 空闲检测定时器ID
+		DWORD m_lastActivityTime{ 0 };         // 最后活动时间（毫秒）
+		static constexpr DWORD IDLE_TIMEOUT = 30 * 60 * 1000; // 30分钟超时
 			
 		// 分层窗口（像素覆盖层）
 		HWND m_hPixelOverlay{ nullptr };       // 分层窗口句柄
@@ -287,6 +292,12 @@ namespace snake
 	    void UpdateStatusBarText(int part, LPCWSTR text);
 	    void UpdateStatusBarText(int part, std::string& text);
 	    void ResizeStatusBar();
+		
+		// 空闲检测
+		void StartIdleTimer();
+		void StopIdleTimer();
+		void ResetActivityTime();
+		void CheckIdleTimeout();
 
 	};
 

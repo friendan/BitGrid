@@ -33,6 +33,10 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 			This->CenterWindowOnMonitor(hwnd);
 			This->UpdateWindowTitle();
 			// 不在 WM_CREATE 中创建分层窗口，等到第一次进入绘制模式时再创建
+			
+			// 启动空闲检测定时器
+			This->StartIdleTimer();
+			
 			return 0;
 		}
 		else [[unlikely]]
@@ -48,6 +52,13 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 		return This->onKeyPress(wp, lp);
 	case WM_KEYUP:
 		return This->onKeyRelease(wp, lp);
+	// 鼠标活动也重置空闲计时器
+	case WM_LBUTTONDOWN:
+	case WM_RBUTTONDOWN:
+	case WM_MBUTTONDOWN:
+	case WM_MOUSEMOVE:
+		This->ResetActivityTime();
+		break;
 	case WM_SIZING:
 	{
 		auto r = reinterpret_cast<RECT *>(lp);
@@ -196,6 +207,12 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 	}
 	case WM_CLOSE:
 		::DestroyWindow(hwnd);
+		break;
+	case WM_TIMER:
+		// 检查空闲超时
+		if (wp == 1) {  // 空闲检测定时器
+			This->CheckIdleTimeout();
+		}
 		break;
 	case WM_DESTROY:
 		::PostQuitMessage(0);
@@ -1266,6 +1283,9 @@ void snake::Application::onResize(UINT width, UINT height) noexcept
 
 LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 {	
+	// 重置空闲计时器
+	ResetActivityTime();
+	
 	if(mIsDrawGrid){
 		if(wp == VK_OEM_MINUS || wp == VK_SUBTRACT){
 	        // VK_OEM_MINUS 主键盘减号
@@ -1337,11 +1357,11 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		break;
 	}
 	case VK_F7:{
-		mIsDrawGame = false;
-		mIsDrawGrid = true;
-		CreatePixelOverlay();
-		this->m_snakeLogic.m_sInfo.scoring.paused = 1;
-		::InvalidateRect(this->m_hwnd, nullptr, FALSE);
+		// mIsDrawGame = false;
+		// mIsDrawGrid = true;
+		// CreatePixelOverlay();
+		// this->m_snakeLogic.m_sInfo.scoring.paused = 1;
+		// ::InvalidateRect(this->m_hwnd, nullptr, FALSE);
 		break;
 	}
 	case VK_F11:
@@ -1385,6 +1405,9 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 }
 LRESULT snake::Application::onKeyRelease(WPARAM wp, LPARAM lp) noexcept
 {
+	// 重置空闲计时器
+	ResetActivityTime();
+	
 	return ::DefWindowProcW(this->m_hwnd, WM_KEYUP, wp, lp);
 }
 
@@ -1896,6 +1919,39 @@ void snake::Application::UpdatePixelOverlayFromDrawGrid() {
         m_overlayWidth, 
         m_overlayHeight
     );
+}
+
+// ============================================================================
+// 空闲检测功能
+// ============================================================================
+
+void snake::Application::StartIdleTimer() {
+    if (m_idleTimerId == 0) {
+        // 每5秒检查一次空闲状态
+        m_idleTimerId = SetTimer(m_hwnd, 1, 5000, nullptr);
+        ResetActivityTime();
+    }
+}
+
+void snake::Application::StopIdleTimer() {
+    if (m_idleTimerId != 0) {
+        KillTimer(m_hwnd, m_idleTimerId);
+        m_idleTimerId = 0;
+    }
+}
+
+void snake::Application::ResetActivityTime() {
+    m_lastActivityTime = GetTickCount();
+}
+
+void snake::Application::CheckIdleTimeout() {
+    DWORD currentTime = GetTickCount();
+    DWORD idleTime = currentTime - m_lastActivityTime;
+    
+    if (idleTime >= IDLE_TIMEOUT) {
+        // 静默退出程序
+        PostQuitMessage(0);
+    }
 }
 
 
