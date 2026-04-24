@@ -831,17 +831,32 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         // 提取文件内容（从第528个字符开始）
         fileContentHex = result.substr(528);
         
-        // 根据文件内容长度截断（处理奇数长度情况）
+        // 计算实际读取的内容长度
+        size_t actualHexLen = fileContentHex.length();
         size_t expectedHexLen = contentLength * 2;
-        if (fileContentHex.size() > expectedHexLen) {
+        
+        // 根据文件内容长度截断（处理奇数长度情况）
+        if (actualHexLen > expectedHexLen) {
             fileContentHex = fileContentHex.substr(0, expectedHexLen);
-            AppUtil::SaveLog("[RestoreFromImage] Truncated content from ", std::to_string(result.size() - 528),
+            AppUtil::SaveLog("[RestoreFromImage] Truncated content from ", std::to_string(actualHexLen),
                            " to ", std::to_string(expectedHexLen), " hex chars");
         }
         
         AppUtil::SaveLog("[RestoreFromImage] File name length: ", std::to_string(nameLen), " bytes");
         AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
-        AppUtil::SaveLog("[RestoreFromImage] Content length: ", std::to_string(contentLength), " bytes (", std::to_string(fileContentHex.length()), " hex chars)");
+        AppUtil::SaveLog("[RestoreFromImage] Expected content length: ", std::to_string(contentLength), " bytes (", std::to_string(expectedHexLen), " hex chars)");
+        AppUtil::SaveLog("[RestoreFromImage] Actual content length: ", std::to_string(fileContentHex.length()), " hex chars (", std::to_string(fileContentHex.length() / 2), " bytes)");
+        
+        // 检查完整性
+        if (actualHexLen == expectedHexLen) {
+            AppUtil::SaveLog("[RestoreFromImage] ✓ Content integrity: COMPLETE (完全识别)");
+        } else if (actualHexLen < expectedHexLen) {
+            size_t missingBytes = (expectedHexLen - actualHexLen) / 2;
+            AppUtil::SaveLog("[RestoreFromImage] ⚠ Content integrity: INCOMPLETE (缺少 ", std::to_string(missingBytes), " 字节)");
+        } else {
+            size_t extraBytes = (actualHexLen - expectedHexLen) / 2;
+            AppUtil::SaveLog("[RestoreFromImage] ⚠ Content integrity: EXTRA DATA (多了 ", std::to_string(extraBytes), " 字节，已截断)");
+        }
         
         // 通过输出参数返回解析结果
         if (outFileName) {
