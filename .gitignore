@@ -39,6 +39,11 @@
 
 # debug information files
 *.dwo
+*.png
 build
 demo
 /bin/Debug/*.exp
+/bin/Debug/*.log
+/bin/Debug/*.lua
+/bin/Debug/file
+

@@ -804,7 +804,13 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     }
     
     AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
-    AppUtil::SaveLog("[RestoreFromImage] Result length: ", std::to_string(result.length()));
+    
+    // 输出十六进制字符串长度和对应的字节数
+    size_t resultLen = result.length();
+    size_t resultBytes = resultLen / 2;
+    char hexBuf1[16];
+    snprintf(hexBuf1, sizeof(hexBuf1), "0x%zX", resultLen);
+    AppUtil::SaveLog("[RestoreFromImage] Result hex length: ", std::to_string(resultLen), " bytes (", std::string(hexBuf1), ") [", std::to_string(resultBytes), " data bytes]");
         
     delete bitmap;
     AppUtil::SaveLog("[RestoreFromImage] End");
@@ -865,7 +871,11 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     } else if (!isFirstPage) {
         // 非第一页：所有数据都是文件内容
         AppUtil::SaveLog("[RestoreFromImage] Non-first page, all data is file content");
-        AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(fileContentHex.length()));
+        size_t contentLen = fileContentHex.length();
+        size_t contentBytes = contentLen / 2;
+        char hexBuf2[16];
+        snprintf(hexBuf2, sizeof(hexBuf2), "0x%zX", contentLen);
+        AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(contentLen), " bytes (", std::string(hexBuf2), ") [", std::to_string(contentBytes), " data bytes]");
     }
     
     if (outFileContentHex) {
@@ -972,12 +982,22 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
         *outFileContentHex = allFileContentHex;
     }
     
-    AppUtil::SaveLog("[RestoreFromFolder] Total result length: ", std::to_string(result.length()));
+    // 输出总结果长度
+    size_t totalLen = result.length();
+    size_t totalBytes = totalLen / 2;
+    char hexBuf3[16];
+    snprintf(hexBuf3, sizeof(hexBuf3), "0x%zX", totalLen);
+    AppUtil::SaveLog("[RestoreFromFolder] Total hex length: ", std::to_string(totalLen), " bytes (", std::string(hexBuf3), ") [", std::to_string(totalBytes), " data bytes]");
+    
     if (outFileName && !outFileName->empty()) {
         AppUtil::SaveLog("[RestoreFromFolder] File name: ", *outFileName);
     }
     if (outFileContentHex) {
-        AppUtil::SaveLog("[RestoreFromFolder] File content hex length: ", std::to_string(outFileContentHex->length()));
+        size_t fileContentLen = outFileContentHex->length();
+        size_t fileContentBytes = fileContentLen / 2;
+        char hexBuf4[16];
+        snprintf(hexBuf4, sizeof(hexBuf4), "0x%zX", fileContentLen);
+        AppUtil::SaveLog("[RestoreFromFolder] File content hex length: ", std::to_string(fileContentLen), " bytes (", std::string(hexBuf4), ") [", std::to_string(fileContentBytes), " data bytes]");
     }
     
     return result;
