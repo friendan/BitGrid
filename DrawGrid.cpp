@@ -984,6 +984,8 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
     
     // 依次处理每个文件
     std::string allFileContentHex;
+    uint32_t expectedContentLength = 0;  // 从第一页获取预期的文件内容长度
+    
     for (size_t i = 0; i < files.size(); i++) {
         AppUtil::SaveLog("[RestoreFromFolder] Processing file ", std::to_string(i + 1), "/", std::to_string(files.size()), ": ", AppUtil::WStrToStr(files[i].path));
         
@@ -995,13 +997,34 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
         result += pageData;
         allFileContentHex += pageFileContentHex;
         
-        // 第一页包含文件名信息
-        if (isFirst && outFileName && !pageFileName.empty()) {
-            *outFileName = pageFileName;
+        // 第一页包含文件名和文件长度信息
+        if (isFirst) {
+            if (outFileName && !pageFileName.empty()) {
+                *outFileName = pageFileName;
+            }
+            // 从第一页数据中解析文件内容长度
+            if (pageData.size() >= 528) {  // 8 + 512 + 8 = 528
+                std::string contentLenHex = pageData.substr(520, 8);
+                expectedContentLength = AppUtil::HexStrToUInt32(contentLenHex);
+                AppUtil::SaveLog("[RestoreFromFolder] Expected content length from header: ", std::to_string(expectedContentLength), " bytes");
+            }
         }
     }
     
     // 返回合并后的文件内容
+    // 根据文件头记录的长度精确截断
+    if (expectedContentLength > 0) {
+        size_t expectedHexLen = expectedContentLength * 2;
+        if (allFileContentHex.length() > expectedHexLen) {
+            allFileContentHex = allFileContentHex.substr(0, expectedHexLen);
+            AppUtil::SaveLog("[RestoreFromFolder] Truncated from ", std::to_string(expectedHexLen + (allFileContentHex.length() > expectedHexLen ? allFileContentHex.length() - expectedHexLen : 0)),
+                           " to ", std::to_string(expectedHexLen), " hex chars based on header length");
+        } else if (allFileContentHex.length() < expectedHexLen) {
+            AppUtil::SaveLog("[RestoreFromFolder] ⚠ WARNING: Content is shorter than expected! Got ", std::to_string(allFileContentHex.length()),
+                           ", expected ", std::to_string(expectedHexLen));
+        }
+    }
+    
     if (outFileContentHex) {
         *outFileContentHex = allFileContentHex;
     }
