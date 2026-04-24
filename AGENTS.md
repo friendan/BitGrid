@@ -133,3 +133,5 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 1. 这是使用ezui库编写程序的例子代码，可以参考，从而掌握如何使用ezui库
 
 ### 每次改完代码后 要编译项目且没有编译报错才算修改成功 有报错要修正 
+### 绘制代码没问题的，绘制结束时，下一个字符肯定是背景色了，遇到背景色就停止识别是没问题的
+### 边框黑色也是没问题的，找到边框后会过滤边框的

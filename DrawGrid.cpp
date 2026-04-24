@@ -751,15 +751,17 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     uint8_t bits[4] = {0};
     int bitIndex = 0;
     int totalPixels = 0;
-    int errorRow = 0;
     AppUtil::SaveLog("[RestoreFromImage] Starting pixel processing...");
+    
+    int maxPixelsPerRow = 0;
+    int minPixelsPerRow = xEnd - xStart;  // 初始化为最大值
+    int totalRows = 0;
+    int rowsWithPixels = 0;
 
     for (int y = yStart; y < yEnd; y++) {
-        if(errorRow >= 2){
-            AppUtil::SaveLog("[RestoreFromImage] Stopped at y=", std::to_string(y), 
-                " due to ", std::to_string(errorRow), " consecutive empty rows");
-            break;
-        }
+        int rowPixels = 0;  // 记录当前行读取的像素数
+        bool rowHasData = false;
+        
         for (int x = xStart; x < xEnd; x++) {
             Gdiplus::Color color;
             bitmap->GetPixel(x, y, &color);
@@ -767,13 +769,22 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             COLORREF rgbColor = ColorToRGB(color);
             uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
 
-            // AppUtil::SaveLog("[RestoreFromImage] x y ", x, " ", y);
-
+            // 遇到无效颜色（背景色），停止当前行，跳到下一行
             if (bit == 255) {
-               errorRow += 1;
-               break;  // 无效颜色（背景色?有时候一行画不满）
+                // 记录首尾几行的详细信息
+                if (y < yStart + 10 || y > yEnd - 10) {
+                    int r = GetRValue(rgbColor);
+                    int g = GetGValue(rgbColor);
+                    int b = GetBValue(rgbColor);
+                    AppUtil::SaveLog("[RestoreFromImage] Row ", std::to_string(y), ": stopped at x=", std::to_string(x), 
+                                   ", pixels=", std::to_string(rowPixels),
+                                   ", color=RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")");
+                }
+                break;  // 停止当前行
             }
             
+            rowPixels++;
+            rowHasData = true;
             totalPixels++;
             bits[bitIndex++] = bit;
             if (bitIndex >= 4) {
@@ -788,10 +799,23 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
                 bitIndex = 0;
             }
         }
+        
+        // 统计每行的像素数
+        totalRows++;
+        if (rowPixels > 0) {
+            rowsWithPixels++;
+            if (rowPixels > maxPixelsPerRow) maxPixelsPerRow = rowPixels;
+            if (rowPixels < minPixelsPerRow) minPixelsPerRow = rowPixels;
+        }
     }
     
     AppUtil::SaveLog("[RestoreFromImage] Pixel processing done");
     AppUtil::SaveLog("[RestoreFromImage] bitIndex: ", std::to_string(bitIndex));
+    AppUtil::SaveLog("[RestoreFromImage] Statistics: totalRows=", std::to_string(totalRows),
+                     ", rowsWithPixels=", std::to_string(rowsWithPixels),
+                     ", maxPixelsPerRow=", std::to_string(maxPixelsPerRow),
+                     ", minPixelsPerRow=", std::to_string(minPixelsPerRow),
+                     ", expectedWidth=", std::to_string(xEnd - xStart));
     
     // 处理剩余的bits（不足4个时用0填充）
     if (bitIndex > 0) {
