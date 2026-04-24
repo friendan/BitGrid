@@ -200,7 +200,11 @@ public:
                 std::wstring wFileName = AppUtil::StrToWStr(fileName);
                 wFileName = PathUtil::SanitizeFileName(wFileName, L"restored.bin");
 
-                std::wstring outPath = PathUtil::GetExeDir() + L"\\" + wFileName;
+                // 在 exe 目录下创建 file 子目录
+                std::wstring fileDir = PathUtil::GetExeDir() + L"\\file";
+                PathUtil::EnsureDirExists(fileDir);
+                
+                std::wstring outPath = fileDir + L"\\" + wFileName;
                 if (!AppUtil::WriteHexStringToFile(fileContentHex, outPath)) {
                     AddLog(L"[ERROR] 写入还原文件失败: " + outPath);
                     UpdateStatus(L"识别失败", L"", L"");
