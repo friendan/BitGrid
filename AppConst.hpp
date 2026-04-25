@@ -16,7 +16,7 @@ namespace AppConst
 
 	constexpr uint32_t BitColor[2] = { 0xFF000000, 0xFFFFFFFF};
 	constexpr uint32_t TASKBAR_HEIGHT = 26;
-	constexpr int COLOR_THRESHOLD = 320;  // 颜色识别误差阈值，进一步降低避免灰色背景被误识别（远程桌面环境下RGB(108,108,108)到黑色距离324会被误识别）
+	constexpr int COLOR_THRESHOLD = 300;  // 颜色识别误差阈值，降低阈值避免灰色背景被误识别（远程桌面环境下背景色可能失真为RGB(108,108,108)到黑色距离324）
 
 
 }
