@@ -17,6 +17,8 @@
 #include "ScreenCapture.hpp"
 #include <fstream>
 #include <ctime>
+#include <thread>
+#include <atomic>
 
 using namespace ezui;
 
@@ -27,9 +29,11 @@ private:
     Label* statusLeft = nullptr;
     Label* statusCenter = nullptr;
     Label* statusRight = nullptr;
+    Button* btnRecognize = nullptr;  // 识别按钮指针
 
     RECT selectedRectScreen{};
     bool hasSelection = false;
+    std::atomic<bool> isRecognizing{false};  // 是否正在识别
     
 public:
     MainFrm(int width, int height) : Window(width, height) {
@@ -94,11 +98,13 @@ public:
         statusLeft = (Label*)this->FindControl("statusLeft");
         statusCenter = (Label*)this->FindControl("statusCenter");
         statusRight = (Label*)this->FindControl("statusRight");
+        btnRecognize = (Button*)this->FindControl("btnRecognize");
         
         AppUtil::SaveLog("[BitGrid] logBox: ", std::to_string((ULONG_PTR)logBox));
         AppUtil::SaveLog("[BitGrid] statusLeft: ", std::to_string((ULONG_PTR)statusLeft));
         AppUtil::SaveLog("[BitGrid] statusCenter: ", std::to_string((ULONG_PTR)statusCenter));
         AppUtil::SaveLog("[BitGrid] statusRight: ", std::to_string((ULONG_PTR)statusRight));
+        AppUtil::SaveLog("[BitGrid] btnRecognize: ", std::to_string((ULONG_PTR)btnRecognize));
         
         if (logBox) {
             logBox->Style.FontSize = 12;
@@ -185,34 +191,35 @@ public:
                 UpdateStatus(L"已截图", L"", L"");
             }
             else if (sender->Name == "btnRecognize") {
-                std::wstring dir = PathUtil::GetTodayFolderPath();
-                AddLog(L"[INFO] 开始识别目录: " + dir);
-
-                std::string fileName;
-                std::string fileContentHex;
-                std::string allHex = DrawGrid::RestoreFromFolder(dir, &fileName, &fileContentHex);
-                if (allHex.empty() || fileContentHex.empty()) {
-                    AddLog(L"[ERROR] 识别失败：未还原到有效数据（请确认目录下存在截图）");
-                    UpdateStatus(L"识别失败", L"", L"");
+                // 如果正在识别，忽略点击
+                if (isRecognizing.load()) {
+                    AddLog(L"[WARN] 识别正在进行中，请稍候...");
                     return true;
                 }
-
-                std::wstring wFileName = AppUtil::StrToWStr(fileName);
-                wFileName = PathUtil::SanitizeFileName(wFileName, L"restored.bin");
-
-                // 在 exe 目录下创建 file 子目录
-                std::wstring fileDir = PathUtil::GetExeDir() + L"\\file";
-                PathUtil::EnsureDirExists(fileDir);
                 
-                std::wstring outPath = fileDir + L"\\" + wFileName;
-                if (!AppUtil::WriteHexStringToFile(fileContentHex, outPath)) {
-                    AddLog(L"[ERROR] 写入还原文件失败: " + outPath);
-                    UpdateStatus(L"识别失败", L"", L"");
-                    return true;
+                // 设置识别状态
+                isRecognizing.store(true);
+                
+                // 禁用识别按钮
+                if (btnRecognize) {
+                    btnRecognize->SetEnabled(false);
                 }
-
-                AddLog(L"[INFO] 识别成功，已生成文件: " + outPath);
-                UpdateStatus(L"识别成功", L"", L"");
+                UpdateStatus(L"识别中...", L"", L"");
+                AddLog(L"[INFO] 开始识别目录: " + PathUtil::GetTodayFolderPath());
+                
+                // 在后台线程中执行识别
+                std::thread([this]() {
+                    std::wstring dir = PathUtil::GetTodayFolderPath();
+                    
+                    std::string fileName;
+                    std::string fileContentHex;
+                    std::string allHex = DrawGrid::RestoreFromFolder(dir, &fileName, &fileContentHex);
+                    
+                    // 识别完成，回到UI线程更新界面
+                    PostMessage(this->Hwnd(), WM_USER + 100, 
+                        allHex.empty() || fileContentHex.empty() ? 0 : 1,
+                        reinterpret_cast<LPARAM>(new std::pair<std::string, std::string>(fileName, fileContentHex)));
+                }).detach();
             }
             else if (sender->Name == "btnClean") {
                 std::wstring dir = PathUtil::GetTodayFolderPath();
@@ -230,6 +237,52 @@ public:
             }
         }
         return __super::OnNotify(sender, args);
+    }
+    
+    // 处理自定义消息（识别完成）
+    virtual LRESULT WndProc(UINT msg, WPARAM wParam, LPARAM lParam) override {
+        if (msg == WM_USER + 100) {
+            // 识别完成消息
+            bool success = (wParam == 1);
+            auto* pData = reinterpret_cast<std::pair<std::string, std::string>*>(lParam);
+            
+            if (success && pData) {
+                std::string fileName = pData->first;
+                std::string fileContentHex = pData->second;
+                
+                std::wstring wFileName = AppUtil::StrToWStr(fileName);
+                wFileName = PathUtil::SanitizeFileName(wFileName, L"restored.bin");
+
+                // 在 exe 目录下创建 file 子目录
+                std::wstring fileDir = PathUtil::GetExeDir() + L"\\file";
+                PathUtil::EnsureDirExists(fileDir);
+                
+                std::wstring outPath = fileDir + L"\\" + wFileName;
+                if (AppUtil::WriteHexStringToFile(fileContentHex, outPath)) {
+                    AddLog(L"[INFO] 识别成功，已生成文件: " + outPath);
+                    UpdateStatus(L"识别成功", L"", L"");
+                } else {
+                    AddLog(L"[ERROR] 写入还原文件失败: " + outPath);
+                    UpdateStatus(L"识别失败", L"", L"");
+                }
+            } else {
+                AddLog(L"[ERROR] 识别失败：未还原到有效数据（请确认目录下存在截图）");
+                UpdateStatus(L"识别失败", L"", L"");
+            }
+            
+            // 释放数据
+            delete pData;
+            
+            // 恢复识别状态
+            isRecognizing.store(false);
+            if (btnRecognize) {
+                btnRecognize->SetEnabled(true);
+            }
+            
+            return 0;
+        }
+        
+        return __super::WndProc(msg, wParam, lParam);
     }
     
     virtual void OnClose(bool& close) override {
