@@ -3,6 +3,7 @@
 #include <cstdint>  // 必须包含，用于uint8_t
 #include <string>
 #include <gdiplus.h>
+#include <functional>
 
 class DrawGrid
 {
@@ -55,9 +56,11 @@ public:
 	                                     bool isFirstPage = true);
 	// 多页情况：传入文件夹路径，返回还原的十六进制字符串（按文件创建时间排序）
 	// 输出参数：outFileName 返回文件名，outFileContentHex 返回文件内容的十六进制
+	// progressCallback: 进度回调函数，参数为(当前文件索引, 总文件数, 当前文件路径)
 	static std::string RestoreFromFolder(const std::wstring& folderPath,
 	                                      std::string* outFileName = nullptr,
-	                                      std::string* outFileContentHex = nullptr);
+	                                      std::string* outFileContentHex = nullptr,
+	                                      std::function<void(int, int, const std::wstring&)> progressCallback = nullptr);
 
 public:
 	size_t mWidth = 0;

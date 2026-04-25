@@ -213,7 +213,25 @@ public:
                     
                     std::string fileName;
                     std::string fileContentHex;
-                    std::string allHex = DrawGrid::RestoreFromFolder(dir, &fileName, &fileContentHex);
+                    
+                    // 定义进度回调函数
+                    auto progressCallback = [this](int current, int total, const std::wstring& filePath) {
+                        // 提取文件名
+                        size_t lastSlash = filePath.find_last_of(L"\\");
+                        std::wstring fileName = (lastSlash != std::wstring::npos) ? 
+                            filePath.substr(lastSlash + 1) : filePath;
+                        
+                        // 构建进度消息
+                        wchar_t progressMsg[512];
+                        swprintf_s(progressMsg, L"[INFO] 正在识别: %s (%d/%d)", 
+                            fileName.c_str(), current, total);
+                        
+                        // 发送消息到UI线程更新日志
+                        PostMessage(this->Hwnd(), WM_USER + 101, 0,
+                            reinterpret_cast<LPARAM>(new std::wstring(progressMsg)));
+                    };
+                    
+                    std::string allHex = DrawGrid::RestoreFromFolder(dir, &fileName, &fileContentHex, progressCallback);
                     
                     // 识别完成，回到UI线程更新界面
                     PostMessage(this->Hwnd(), WM_USER + 100, 
@@ -279,6 +297,15 @@ public:
                 btnRecognize->SetEnabled(true);
             }
             
+            return 0;
+        }
+        else if (msg == WM_USER + 101) {
+            // 进度更新消息
+            auto* pMsg = reinterpret_cast<std::wstring*>(lParam);
+            if (pMsg) {
+                AddLog(*pMsg);
+                delete pMsg;
+            }
             return 0;
         }
         

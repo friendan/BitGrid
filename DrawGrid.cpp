@@ -999,7 +999,8 @@ static std::vector<FileInfo> GetImageFilesSorted(const std::wstring& folderPath)
 //=============================================================================
 std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
                                          std::string* outFileName,
-                                         std::string* outFileContentHex)
+                                         std::string* outFileContentHex,
+                                         std::function<void(int, int, const std::wstring&)> progressCallback)
 {
     std::string result;
     
@@ -1017,6 +1018,11 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
     uint32_t expectedContentLength = 0;  // 从第一页获取预期的文件内容长度
     
     for (size_t i = 0; i < files.size(); i++) {
+        // 调用进度回调
+        if (progressCallback) {
+            progressCallback(static_cast<int>(i + 1), static_cast<int>(files.size()), files[i].path);
+        }
+        
         AppUtil::SaveLog("[RestoreFromFolder] Processing file ", std::to_string(i + 1), "/", std::to_string(files.size()), ": ", AppUtil::WStrToStr(files[i].path));
         
         std::string pageFileName;
