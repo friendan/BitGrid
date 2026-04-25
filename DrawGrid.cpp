@@ -762,6 +762,9 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         int rowPixels = 0;  // 记录当前行读取的像素数
         bool rowHasData = false;
         
+        // 是否记录详细日志（最后10行且该行像素数接近预期宽度）
+        bool logDetail = (y >= yEnd - 10);
+        
         for (int x = xStart; x < xEnd; x++) {
             Gdiplus::Color color;
             bitmap->GetPixel(x, y, &color);
@@ -776,11 +779,45 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
                     int r = GetRValue(rgbColor);
                     int g = GetGValue(rgbColor);
                     int b = GetBValue(rgbColor);
+                    int distBlack = r + g + b;
+                    int distWhite = (255-r) + (255-g) + (255-b);
                     AppUtil::SaveLog("[RestoreFromImage] Row ", std::to_string(y), ": stopped at x=", std::to_string(x), 
                                    ", pixels=", std::to_string(rowPixels),
-                                   ", color=RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")");
+                                   ", color=RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
+                                   ", distBlack=", std::to_string(distBlack),
+                                   ", distWhite=", std::to_string(distWhite));
+                    
+                    // 如果这一行多识别了像素，记录前一个像素的信息
+                    if (logDetail && rowPixels >= (xEnd - xStart) - 3 && rowPixels < (xEnd - xStart)) {
+                        // 记录最后一个有效像素
+                        if (rowPixels > 0) {
+                            Gdiplus::Color lastColor;
+                            bitmap->GetPixel(x - 1, y, &lastColor);
+                            COLORREF lastRgb = ColorToRGB(lastColor);
+                            int lr = GetRValue(lastRgb);
+                            int lg = GetGValue(lastRgb);
+                            int lb = GetBValue(lastRgb);
+                            uint8_t lastBit = AppUtil::GetRgbColorBit(lastRgb);
+                            AppUtil::SaveLog("[RestoreFromImage]   -> Last valid pixel at x=", std::to_string(x-1),
+                                           ", RGB(", std::to_string(lr), ",", std::to_string(lg), ",", std::to_string(lb), ")",
+                                           ", bit=", std::to_string(lastBit));
+                        }
+                    }
                 }
                 break;  // 停止当前行
+            }
+            
+            // 记录最后几行的每个像素（特别是接近边界的像素）
+            if (logDetail && rowPixels >= (xEnd - xStart) - 5) {
+                int r = GetRValue(rgbColor);
+                int g = GetGValue(rgbColor);
+                int b = GetBValue(rgbColor);
+                int distBlack = r + g + b;
+                AppUtil::SaveLog("[RestoreFromImage] DEBUG Row ", std::to_string(y), " x=", std::to_string(x),
+                               " pixel#", std::to_string(rowPixels),
+                               " RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
+                               " distBlack=", std::to_string(distBlack),
+                               " bit=", std::to_string(bit));
             }
             
             rowPixels++;
@@ -788,13 +825,6 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             totalPixels++;
             bits[bitIndex++] = bit;
             if (bitIndex >= 4) {
-                // AppUtil::SaveLog(" x y ", x-3, " ", y
-                //     , " bits: "
-                //     , bits[0], " "
-                //     , bits[1], " "
-                //     , bits[2], " "
-                //     , bits[3]
-                // );
                 result += AppUtil::BitsToHexChar(bits);
                 bitIndex = 0;
             }
