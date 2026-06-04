@@ -249,6 +249,7 @@ public:
                 }
                 AddLog(L"[INFO] 已清理目录: " + dir);
                 UpdateStatus(L"已清理", L"", L"");
+                ClearLog();  // 清空日志窗口
             }
             else if (sender->Name == "btnAbout") {
                 MessageBoxW(this->Hwnd(), L"BitGrid", L"关于", MB_OK);
