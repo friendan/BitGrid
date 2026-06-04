@@ -1,2 +1,2 @@
 cmake --build build --config Debug
-@cmd /k
+rem @cmd /k
