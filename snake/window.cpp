@@ -139,7 +139,7 @@ LRESULT CALLBACK snake::Application::sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp,
 	        SendMessage(This->m_hStatusBar, WM_SIZE, 0, 0);
 	    }
 
-	    // 再拿到【真正可用的】客户区
+	    // 再拿到客户区大小，传给 D2D
 		RECT r;
 		::GetClientRect(hwnd, &r);
 		This->onResize(r.right - r.left, r.bottom - r.top);
@@ -816,7 +816,7 @@ bool snake::Application::initApp(HINSTANCE hInst, int nCmdShow)
 		0,
 		this->s_className.data(),
 		this->s_applicationName.data(),
-		WS_OVERLAPPEDWINDOW,
+		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,

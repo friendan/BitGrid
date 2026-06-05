@@ -20,5 +20,5 @@ DIB 像素数据 → UpdateLayeredWindow → DWM 合成 → 屏幕
 ✅ 跟随窗口移动（自动更新位置）
 
 https://github.com/forrestchang/andrej-karpathy-skills
-
-
+https://github.com/RapidAI/RapidOCR
+https://onnxruntime.ai
