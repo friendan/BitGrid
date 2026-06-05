@@ -5,9 +5,10 @@ project(BitGrid)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+# exe 输出到 bin 目录（不按配置名分目录），.lib/.exp/.pdb 等留在 build 目录
+foreach(conf DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${conf} ${CMAKE_SOURCE_DIR}/bin)
+endforeach()
 
 # 设置UTF8编码
 add_compile_options("/utf-8")
@@ -50,6 +51,11 @@ set(PROJECT_HEADERS
 # 添加main.cpp作为主入口文件
 add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${EZUI_SOURCES} ${RESOURCE_FILES})
 
+# Debug版输出加_dbg后缀
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    OUTPUT_NAME_DEBUG "${PROJECT_NAME}_dbg"
+)
+
 # 链接必要的系统库
 target_link_libraries(${PROJECT_NAME} PRIVATE
     user32
@@ -75,9 +81,3 @@ set_property(SOURCE BitGrid.rc PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DI
 
 # 将 snake 作为子工程引入，独立编译为 GridGame.exe
 add_subdirectory(snake)
-
-
-
-
-
-

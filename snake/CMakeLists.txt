@@ -23,9 +23,10 @@ if(MSVC)
     endforeach()
 endif()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
+# exe 输出到 bin 目录（不按配置名分目录），.lib/.exp/.pdb 等留在 build 目录
+foreach(conf DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${conf} ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
+endforeach()
 
 remove_definitions(-D_MBCS)
 add_definitions(-DUNICODE -D_UNICODE)
@@ -66,46 +67,5 @@ target_link_libraries(${TARGET_NAME} PRIVATE shell32.lib comctl32.lib shlwapi.li
 
 set_target_properties(${TARGET_NAME} PROPERTIES
     OUTPUT_NAME_RELEASE "GridGame"
-    OUTPUT_NAME_DEBUG   "GridGame"
+    OUTPUT_NAME_DEBUG   "GridGame_dbg"
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
