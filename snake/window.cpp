@@ -1675,47 +1675,54 @@ void snake::Application::UpdateDrawGridInfo(){
 	static size_t lastCurPage = 0;
 	static size_t lastFileSize = 0;
 	
-	size_t curWidth = pDrawGrid->mDrawWidth;
-	size_t curHeight = pDrawGrid->mDrawHeight;
-	size_t curPageSize = pDrawGrid->mPageSize;
-	size_t curTotalPage = pDrawGrid->mTotalPage;
-	size_t curCurPage = pDrawGrid->mCurPage;
-	size_t curFileSize = AppUtil::DrawFileSize;
+	size_t curWidth = pDrawGrid->mDrawWidth;   // 绘图客户区宽度
+	size_t curHeight = pDrawGrid->mDrawHeight; // 绘图客户区高度
+	size_t curPageSize = pDrawGrid->mPageSize; // 一页能显示的十六进制字符总数
+	size_t curTotalPage = pDrawGrid->mTotalPage; // 总页数
+	size_t curCurPage = pDrawGrid->mCurPage;     // 当前是第N页
+	size_t curFileSize = AppUtil::DrawFileSize;  // 文件大小(单位：字节)
 	
 	wchar_t wszBuff[256] = {0};
 	
 	// 只有数据变化时才更新状态栏
-	if (curWidth != lastWidth || curHeight != lastHeight) {
-		swprintf_s(wszBuff, L"%zux%zu", curWidth, curHeight);
-		UpdateStatusBarText(0, wszBuff);
-		lastWidth = curWidth;
-		lastHeight = curHeight;
-	}
+	// if (curWidth != lastWidth || curHeight != lastHeight) {
+	// 	swprintf_s(wszBuff, L"%zux%zu", curWidth, curHeight);
+	// 	UpdateStatusBarText(0, wszBuff);
+	// 	lastWidth = curWidth;
+	// 	lastHeight = curHeight;
+	// }
 	
-	if (curPageSize != lastPageSize) {
-		swprintf_s(wszBuff, L"%zu", curPageSize);
-		UpdateStatusBarText(1, wszBuff);
-		lastPageSize = curPageSize;
-	}
+	// if (curPageSize != lastPageSize) {
+	// 	swprintf_s(wszBuff, L"%zu", curPageSize);
+	// 	UpdateStatusBarText(1, wszBuff);
+	// 	lastPageSize = curPageSize;
+	// }
 	
-	if (curTotalPage != lastTotalPage || curCurPage != lastCurPage) {
-		swprintf_s(wszBuff, L"%zu | %zu", curTotalPage, curCurPage);
-		UpdateStatusBarText(2, wszBuff);
-		lastTotalPage = curTotalPage;
-		lastCurPage = curCurPage;
-	}
+	// if (curTotalPage != lastTotalPage || curCurPage != lastCurPage) {
+	// 	swprintf_s(wszBuff, L"%zu | %zu", curTotalPage, curCurPage);
+	// 	UpdateStatusBarText(2, wszBuff);
+	// 	lastTotalPage = curTotalPage;
+	// 	lastCurPage = curCurPage;
+	// }
 	
-	if (curFileSize != lastFileSize) {
-		swprintf_s(wszBuff, L"%zu", curFileSize);
-		UpdateStatusBarText(3, wszBuff);
-		lastFileSize = curFileSize;
-	}
+	// if (curFileSize != lastFileSize) {
+	// 	swprintf_s(wszBuff, L"%zu", curFileSize);
+	// 	UpdateStatusBarText(3, wszBuff);
+	// 	lastFileSize = curFileSize;
+	// }
 
-    // std::wstring whexStr = AppUtil::StrToWStr(pDrawGrid->mHexString);
-    // if(whexStr.size() > 0){
-    // 	swprintf_s(wszBuff, L"%s", whexStr.substr(0,128).c_str());
-    // 	UpdateStatusBarText(5, wszBuff);
-    // }
+    // 在状态栏的最后一格显示如下内容：文件大小 | 每页能显示的16进制字符数量 | 总页数 | 当前页
+    // 只有数据变化时才更新
+    if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage) {
+        swprintf_s(wszBuff, L"%zu | %zu | %zu | %zu", curFileSize, curPageSize, curTotalPage, curCurPage);
+        UpdateStatusBarText(5, wszBuff);
+        lastFileSize = curFileSize;
+        lastPageSize = curPageSize;
+        lastTotalPage = curTotalPage;
+        lastCurPage = curCurPage;
+    }
+    
+
 }
 
 //=============================================================================
