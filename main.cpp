@@ -39,91 +39,62 @@ private:
     
 public:
     MainFrm(int width, int height) : Window(width, height) {
-        AppUtil::SaveLog("[BitGrid] MainFrm constructor started");
+        // AppUtil::SaveLog("[BitGrid] MainFrm constructor started");
         Init();
-        AppUtil::SaveLog("[BitGrid] MainFrm constructor completed");
+        // AppUtil::SaveLog("[BitGrid] MainFrm constructor completed");
     }
     
     void Init() {
-        AppUtil::SaveLog("[BitGrid] Init() started");
         this->SetText(L"BitGrid");
-        AppUtil::SaveLog("[BitGrid] Window title set");
         
         // 从RC资源加载布局
         std::wstring xmlContent;
-        AppUtil::SaveLog("[BitGrid] Trying RC resource...");
         
         HRSRC hRsrc = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_MAIN_LAYOUT), RT_HTML);
-        AppUtil::SaveLog("[BitGrid] FindResourceW RT_HTML result: ", std::to_string((ULONG_PTR)hRsrc));
         
         if (!hRsrc) {
             hRsrc = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_MAIN_LAYOUT), L"HTML");
-            AppUtil::SaveLog("[BitGrid] FindResourceW L\"HTML\" result: ", std::to_string((ULONG_PTR)hRsrc));
         }
         
         if (hRsrc) {
             HGLOBAL hGlobal = LoadResource(NULL, hRsrc);
-            AppUtil::SaveLog("[BitGrid] LoadResource result: ", std::to_string((ULONG_PTR)hGlobal));
             if (hGlobal) {
                 DWORD size = SizeofResource(NULL, hRsrc);
-                AppUtil::SaveLog("[BitGrid] Resource size: ", std::to_string(size));
                 const char* xmlData = (const char*)LockResource(hGlobal);
                 if (xmlData && size > 0) {
-                    AppUtil::SaveLog("[BitGrid] Resource locked, converting to wide string");
                     int wideLen = MultiByteToWideChar(CP_UTF8, 0, xmlData, size, NULL, 0);
-                    AppUtil::SaveLog("[BitGrid] Wide char length: ", std::to_string(wideLen));
                     if (wideLen > 0) {
                         xmlContent.resize(wideLen);
                         MultiByteToWideChar(CP_UTF8, 0, xmlData, size, &xmlContent[0], wideLen);
-                        AppUtil::SaveLog("[BitGrid] Loaded from RC resource successfully");
                     }
                 }
             }
         }
         
-        AppUtil::SaveLog("[BitGrid] XML content size: ", std::to_string(xmlContent.size()));
         if (!xmlContent.empty()) {
-            AppUtil::SaveLog("[BitGrid] Calling LoadXmlData...");
             ui.LoadXmlData(xmlContent.c_str());
-            AppUtil::SaveLog("[BitGrid] LoadXmlData completed");
-        }
-        else {
-            AppUtil::SaveLog("[BitGrid] ERROR: XML content is empty!");
         }
         
-        AppUtil::SaveLog("[BitGrid] Calling SetupUI...");
         ui.SetupUI(this);
-        AppUtil::SaveLog("[BitGrid] SetupUI completed");
         
-        AppUtil::SaveLog("[BitGrid] Getting control references...");
         logBox = (TextBox*)this->FindControl("logBox");
         statusLeft = (Label*)this->FindControl("statusLeft");
         statusCenter = (Label*)this->FindControl("statusCenter");
         statusRight = (Label*)this->FindControl("statusRight");
         btnRecognize = (Button*)this->FindControl("btnRecognize");
         
-        AppUtil::SaveLog("[BitGrid] logBox: ", std::to_string((ULONG_PTR)logBox));
-        AppUtil::SaveLog("[BitGrid] statusLeft: ", std::to_string((ULONG_PTR)statusLeft));
-        AppUtil::SaveLog("[BitGrid] statusCenter: ", std::to_string((ULONG_PTR)statusCenter));
-        AppUtil::SaveLog("[BitGrid] statusRight: ", std::to_string((ULONG_PTR)statusRight));
-        AppUtil::SaveLog("[BitGrid] btnRecognize: ", std::to_string((ULONG_PTR)btnRecognize));
-        
         if (logBox) {
             logBox->Style.FontSize = 12;
         }
         
-        AppUtil::SaveLog("[BitGrid] Adding startup log...");
         AddLog(L"ready...");
         
-        AppUtil::SaveLog("[BitGrid] Updating status bar...");
         UpdateStatus(L"就绪", L"", L"");
-        
-        AppUtil::SaveLog("[BitGrid] Init() completed");
     }
     
     void AddLog(const std::wstring& message) {
-        // 使用 AppUtil::SaveLog 统一记录日志
-        AppUtil::SaveLog("[BitGrid UI] ", AppUtil::WStrToStr(message));
+        // 只打印到窗口，不写日志文件
+        // AppUtil::SaveLog("[BitGrid UI] ", AppUtil::WStrToStr(message));
         
         if (logBox) {
             // 获取当前时间
@@ -335,11 +306,8 @@ public:
 
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
-    AppUtil::SaveLog("=== BitGrid Program Started ===");
-    
     // 初始化GDI+
     DrawGrid::Inst()->InitGdiPlus();
-    AppUtil::SaveLog("[BitGrid] GDI+ initialized");
     
     Application app;
     app.EnableHighDpi();
@@ -353,7 +321,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
     
     // 卸载GDI+
     DrawGrid::Inst()->UninitGdiPlus();
-    AppUtil::SaveLog("[BitGrid] GDI+ shutdown");
     
     return result;
 }
