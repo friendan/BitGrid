@@ -176,6 +176,9 @@ public:
                 AddLog(L"[INFO] 截图已保存: " + outPng);
                 UpdateStatus(L"已截图", L"", L"");
             }
+            else if (sender->Name == "btnAutoAction") {
+                AddLog(L"[TODO] 自动操作功能尚未实现");
+            }
             else if (sender->Name == "btnRecognize") {
                 // 如果正在识别，忽略点击
                 if (isRecognizing.load()) {
