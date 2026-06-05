@@ -22,3 +22,25 @@ DIB 像素数据 → UpdateLayeredWindow → DWM 合成 → 屏幕
 https://github.com/forrestchang/andrej-karpathy-skills
 https://github.com/RapidAI/RapidOCR
 https://onnxruntime.ai
+
+## 区域选择功能（2026-06-05）
+
+BitGrid.exe 工具栏上有两个区域选择按钮：
+
+### 1. 选择窗口区域（btnSelect）
+- 按钮文本："选择窗口区域"
+- 用鼠标拖拽框选屏幕上任意矩形区域
+- 选择结果存入 `selectedRectScreen`（`RECT` 类型）
+- `hasSelection` 标记是否已选择
+- 供"截图"、"识别"等功能使用
+
+### 2. 选择状态栏区域（btnSelectStatusBar）
+- 按钮文本："选择状态栏区域"
+- 功能和选择窗口区域相同，选择结果独立存储
+- 选择结果存入 `selectedStatusBarRect`（`RECT` 类型）
+- `hasStatusBarSelection` 标记是否已选择
+- 预留用于后续新功能
+
+### 相关文件
+- `main.htm` — 按钮布局定义
+- `main.cpp` — 事件处理逻辑

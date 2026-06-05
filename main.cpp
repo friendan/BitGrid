@@ -32,7 +32,9 @@ private:
     Button* btnRecognize = nullptr;  // 识别按钮指针
 
     RECT selectedRectScreen{};
+    RECT selectedStatusBarRect{};
     bool hasSelection = false;
+    bool hasStatusBarSelection = false;
     std::atomic<bool> isRecognizing{false};  // 是否正在识别
     
 public:
@@ -169,6 +171,19 @@ public:
                 else {
                     AddLog(L"[WARN] 已取消选择");
                     UpdateStatus(L"就绪", L"", L"");
+                }
+            }
+            else if (sender->Name == "btnSelectStatusBar") {
+                AddLog(L"[INFO] 进入选择模式：拖拽框选状态栏区域，ESC/右键取消");
+                RECT rc{};
+                if (ScreenSelectOverlay::SelectRect(rc)) {
+                    selectedStatusBarRect = rc;
+                    hasStatusBarSelection = true;
+                    AddLog(L"[INFO] 已选择状态栏区域: (" + std::to_wstring(rc.left) + L"," + std::to_wstring(rc.top) + L")-(" +
+                        std::to_wstring(rc.right) + L"," + std::to_wstring(rc.bottom) + L")");
+                }
+                else {
+                    AddLog(L"[WARN] 已取消选择状态栏区域");
                 }
             }
             else if (sender->Name == "btnShot") {
