@@ -6,8 +6,28 @@
 //  Copyright © 2018, Alibaba Group Holding Limited
 //
 
+// 在包含任何头文件之前取消 UNICODE 定义，确保 Windows API 展开为 ANSI 版本
+#ifdef UNICODE
+#undef UNICODE
+#endif
+#ifdef _UNICODE
+#undef _UNICODE
+#endif
+
 #include <cstring>
 #include "MNNFileUtils.h"
+
+// 此文件使用 ANSI 版 Windows API，显式调用 A 版本避免 UNICODE 宏展开
+#ifdef _WIN32
+#include <Windows.h>
+#include <direct.h>
+#include <io.h>
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#endif
 
 std::string MNNFilePathConcat(std::string prefix, std::string suffix) {
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
@@ -19,7 +39,7 @@ std::string MNNFilePathConcat(std::string prefix, std::string suffix) {
 
 bool MNNDirExist(const char * path) {
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
-    DWORD file_attributes = GetFileAttributes(path);
+    DWORD file_attributes = GetFileAttributesA(path);
     return (file_attributes != INVALID_FILE_ATTRIBUTES) && (file_attributes & FILE_ATTRIBUTE_DIRECTORY);
 #else
     struct stat info;
@@ -41,7 +61,7 @@ bool MNNCreateDir(const char * path) {
         return true;
     }
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
-    if (CreateDirectory(path, NULL) || ERROR_ALREADY_EXISTS == GetLastError()) {
+    if (CreateDirectoryA(path, NULL) || ERROR_ALREADY_EXISTS == GetLastError()) {
         return true;
     } else {
         return false;
@@ -57,7 +77,7 @@ bool MNNCreateDir(const char * path) {
 file_t MNNCreateFile(const char * file_name)
 {
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
-    HANDLE hd = CreateFile(
+    HANDLE hd = CreateFileA(
         file_name,                      // File Name
         GENERIC_READ | GENERIC_WRITE,   // Read and Write
         0,                              // No Sharing
@@ -99,7 +119,7 @@ file_t MNNOpenFile(const char * file_name, uint32_t flags)
     if (flags & MNN_FILE_WRITE) {
         mode |= GENERIC_WRITE;
     }
-    HANDLE hd = CreateFile(
+    HANDLE hd = CreateFileA(
         file_name,              // File Name
         mode,                   // Opening Mode
         0,                      // No Sharing
@@ -153,7 +173,7 @@ ErrorCode MNNRemoveFile(const char * file_name)
         return FILE_NOT_EXIST;
     }
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
-    if (!DeleteFile(file_name)) {
+    if (!DeleteFileA(file_name)) {
         return FILE_REMOVE_FAILED;
     }
 #else
@@ -273,7 +293,7 @@ void * MNNMmapFile(file_t file, size_t size, bool onlyRead)
         return nullptr;
     }
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
-    HANDLE hFileMapping = CreateFileMapping(file, NULL, PAGE_READWRITE, (size >> 32) & 0xffffffff, size & 0xffffffff, NULL);
+    HANDLE hFileMapping = CreateFileMappingA(file, NULL, PAGE_READWRITE, (size >> 32) & 0xffffffff, size & 0xffffffff, NULL);
     if (hFileMapping == NULL) {
         MNN_ERROR("MNN: Mmap failed\n");
         return nullptr;

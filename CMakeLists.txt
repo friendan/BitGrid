@@ -56,8 +56,16 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     OUTPUT_NAME_DEBUG "${PROJECT_NAME}_dbg"
 )
 
-# 链接必要的系统库
+# MNN 静态库
+add_subdirectory(MNN)
+
+# MNN 头文件路径
+include_directories(MNN/include)
+
+# 链接 MNN 和系统库
+# 注意：MNN 放在前面，系统库放在后面（链接顺序重要）
 target_link_libraries(${PROJECT_NAME} PRIVATE
+    MNN
     user32
     gdi32
     comctl32
