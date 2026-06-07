@@ -1714,7 +1714,7 @@ void snake::Application::UpdateDrawGridInfo(){
     // 在状态栏的最后一格显示如下内容：文件大小 | 每页能显示的16进制字符数量 | 总页数 | 当前页
     // 只有数据变化时才更新
     if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage) {
-        swprintf_s(wszBuff, L"%zu | %zu | %zu | %zu", curFileSize, curPageSize, curTotalPage, curCurPage);
+        swprintf_s(wszBuff, L"%zu#%zu#%zu#%zu", curFileSize, curPageSize, curTotalPage, curCurPage);
         UpdateStatusBarText(5, wszBuff);
         lastFileSize = curFileSize;
         lastPageSize = curPageSize;
