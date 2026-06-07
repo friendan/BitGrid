@@ -37,6 +37,8 @@ private:
     bool hasSelection = false;
     bool hasStatusBarSelection = false;
     std::atomic<bool> isRecognizing{false};  // 是否正在识别
+    std::atomic<bool> isAutoActionRunning{false};  // 自动操作是否正在运行
+    MnnOcr m_ocr;  // OCR 引擎
     
 public:
     MainFrm(int width, int height) : Window(width, height) {
@@ -90,8 +92,222 @@ public:
         
         AddLog(L"ready...");
         
+        // 初始化 OCR 引擎
+        if (!m_ocr.load() || !m_ocr.init(4)) {
+            AppUtil::SaveLog("[MainFrm] OCR engine init failed");
+        }
+        
         UpdateStatus(L"就绪", L"", L"");
     }
+    
+    // ---------- 自动操作相关 ----------
+    
+    /// OCR 识别状态栏区域，返回解析结果
+    struct StatusBarInfo {
+        bool valid = false;
+        size_t fileSize = 0;
+        size_t pageSize = 0;
+        size_t hexCharNum = 0;
+        size_t totalPage = 0;
+        size_t curPage = 0;
+    };
+    
+    /// 对指定区域截图并保存到文件
+    std::wstring CaptureToFile(const RECT& rect, const std::wstring& dir) {
+        std::wstring outPng = PathUtil::NextPngPathInDir(dir);
+        std::wstring err;
+        if (!ScreenCapture::CaptureRectToPng(rect, outPng, &err)) {
+            PostLog(L"[ERROR] 截图失败: " + err);
+            return L"";
+        }
+        return outPng;
+    }
+    
+    /// 在后台线程中安全地发送日志到 UI 线程
+    void PostLog(const std::wstring& msg) {
+        PostMessage(this->Hwnd(), WM_USER + 101, 0,
+            reinterpret_cast<LPARAM>(new std::wstring(msg)));
+    }
+    
+    /// 模拟按键（在当前焦点窗口发送按键消息）
+    void SimulateKeyPress(int vkKey) {
+        // 先发送按键按下
+        keybd_event((BYTE)vkKey, 0, 0, 0);
+        Sleep(50);
+        // 再发送按键弹起
+        keybd_event((BYTE)vkKey, 0, KEYEVENTF_KEYUP, 0);
+        Sleep(200);  // 等待翻页完成
+    }
+    
+    /// 将鼠标移动到指定屏幕坐标
+    void SimulateMouseMove(int x, int y) {
+        SetCursorPos(x, y);
+        Sleep(100);
+    }
+    
+    /// OCR 识别状态栏区域并解析
+    StatusBarInfo RecognizeStatusBar() {
+        StatusBarInfo info;
+        
+        // 截取状态栏区域（放到 exe 目录）
+        std::wstring tmpPng = PathUtil::GetExeDir() + L"\\_statusbar_temp.png";
+        std::wstring err;
+        if (!ScreenCapture::CaptureRectToPng(selectedStatusBarRect, tmpPng, &err)) {
+            PostLog(L"[ERROR] 状态栏截图失败: " + err);
+            return info;
+        }
+        PostLog(L"[INFO] 状态栏截图: " + tmpPng);
+        
+        // OCR 识别
+        auto result = m_ocr.recognizeFile(AppUtil::WStrToStr(tmpPng).c_str());
+        if (result.lines.empty()) {
+            PostLog(L"[WARN] OCR 未识别到任何文字");
+            return info;
+        }
+        
+        // 输出所有识别的行
+        for (size_t i = 0; i < result.lines.size(); i++) {
+            PostLog(L"[INFO] OCR line " + std::to_wstring(i) + L": " +
+                AppUtil::StrToWStr(result.lines[i].text));
+        }
+        
+        // 查找包含 # 分隔符的行（状态栏最后一格格式：size#pageSize#hexCharNum#totalPage#curPage）
+        for (auto& line : result.lines) {
+            std::string& text = line.text;
+            // 用 # 分割
+            size_t p1 = text.find('#');
+            if (p1 == std::string::npos) continue;
+            size_t p2 = text.find('#', p1 + 1);
+            if (p2 == std::string::npos) continue;
+            size_t p3 = text.find('#', p2 + 1);
+            if (p3 == std::string::npos) continue;
+            size_t p4 = text.find('#', p3 + 1);
+            if (p4 == std::string::npos) continue;
+            
+            try {
+                info.fileSize = std::stoull(text.substr(0, p1));
+                info.pageSize = std::stoull(text.substr(p1 + 1, p2 - p1 - 1));
+                info.hexCharNum = std::stoull(text.substr(p2 + 1, p3 - p2 - 1));
+                info.totalPage = std::stoull(text.substr(p3 + 1, p4 - p3 - 1));
+                info.curPage = std::stoull(text.substr(p4 + 1));
+                info.valid = true;
+                PostLog(L"[INFO] 解析到: fileSize=" + std::to_wstring(info.fileSize) +
+                    L" pageSize=" + std::to_wstring(info.pageSize) +
+                    L" hexCharNum=" + std::to_wstring(info.hexCharNum) +
+                    L" totalPage=" + std::to_wstring(info.totalPage) +
+                    L" curPage=" + std::to_wstring(info.curPage));
+                return info;
+            } catch (...) {
+                continue;
+            }
+        }
+        
+        PostLog(L"[WARN] 未找到符合格式的状态栏信息");
+        return info;
+    }
+    
+    /// 判断截图是否正确（通过 OCR 识别截图，对比 hexCharNum）
+    bool ValidateScreenshot(const std::wstring& pngPath, size_t expectedHexChars) {
+        PostLog(L"[INFO] 验证截图: " + pngPath + L" 期望hex字符数: " + std::to_wstring(expectedHexChars));
+        
+        auto result = m_ocr.recognizeFile(AppUtil::WStrToStr(pngPath).c_str());
+        if (result.lines.empty()) {
+            PostLog(L"[WARN] 截图验证失败: OCR 未识别到文字");
+            return false;
+        }
+        
+        // 拼接所有识别的文本
+        std::string allText;
+        for (auto& line : result.lines) {
+            allText += line.text;
+        }
+        
+        // 去除空格和换行
+        std::string cleanText;
+        for (char c : allText) {
+            if (c != ' ' && c != '\n' && c != '\r' && c != '\t') {
+                cleanText += c;
+            }
+        }
+        
+        size_t actualChars = cleanText.size();
+        PostLog(L"[INFO] 截图识别到 " + std::to_wstring(actualChars) + L" 个hex字符，期望 " + std::to_wstring(expectedHexChars));
+        
+        return actualChars == expectedHexChars;
+    }
+    
+    /// 自动操作主逻辑（在后台线程中运行）
+    void RunAutoAction() {
+        PostLog(L"[INFO] 自动操作线程已启动");
+        
+        // 第1步：OCR 识别状态栏，获取当前信息
+        PostLog(L"[INFO] ===== 第1步：识别状态栏 =====");
+        StatusBarInfo statusInfo = RecognizeStatusBar();
+        if (!statusInfo.valid) {
+            PostLog(L"[ERROR] 未识别到状态栏信息，流程终止");
+            FinishAutoAction(false);
+            return;
+        }
+        
+        size_t targetTotalPage = statusInfo.totalPage;
+        PostLog(L"[INFO] 共 " + std::to_wstring(targetTotalPage) + L" 页，从第 " +
+            std::to_wstring(statusInfo.curPage) + L" 页开始");
+        
+        // 创建截图目录，并清空旧截图
+        std::wstring dir = PathUtil::GetTodayFolderPath();
+        PathUtil::RemoveDirRecursive(dir);
+        PathUtil::EnsureDirExists(dir);
+        PostLog(L"[INFO] 已清空截图目录: " + dir);
+        
+        // 第2步：循环截图、翻页
+        for (size_t page = statusInfo.curPage; page <= targetTotalPage; page++) {
+            PostLog(L"[INFO] ===== 第 " + std::to_wstring(page) + L"/" + std::to_wstring(targetTotalPage) + L" 页 =====");
+            
+            // 2a. 截取窗口区域
+            PostLog(L"[INFO] 截取窗口区域...");
+            std::wstring pngPath = CaptureToFile(selectedRectScreen, dir);
+            if (pngPath.empty()) {
+                PostLog(L"[ERROR] 截图失败，流程终止");
+                FinishAutoAction(false);
+                return;
+            }
+            PostLog(L"[INFO] 已截图: " + pngPath);
+            
+            // 2b. 截图完成，记录日志
+            PostLog(L"[INFO] 截图完成");
+            
+            // 2c. 判断是否还有下一页
+            if (page >= targetTotalPage) {
+                PostLog(L"[INFO] 所有页面截图完成");
+                break;
+            }
+            
+            // 2d. 翻页：鼠标移动到状态栏区域，按空格键
+            // 使用状态栏区域中心位置
+            int centerX = (selectedStatusBarRect.left + selectedStatusBarRect.right) / 2;
+            int centerY = (selectedStatusBarRect.top + selectedStatusBarRect.bottom) / 2;
+            PostLog(L"[INFO] 翻页：移动鼠标到 (" + std::to_wstring(centerX) + L"," + std::to_wstring(centerY) +
+                L") 并按下空格");
+            SimulateMouseMove(centerX, centerY);
+            SimulateKeyPress(VK_SPACE);
+        }
+        
+        // 第3步：所有截图完成，触发手动识别
+        PostLog(L"[INFO] ===== 截图完成，触发手动识别 =====");
+        PostMessage(this->Hwnd(), WM_USER + 200, 0, 0);
+    }
+    
+    /// 结束自动操作（在后台线程中调用）
+    void FinishAutoAction(bool success) {
+        if (success) {
+            PostLog(L"[INFO] ============ 自动操作完成 ============");
+        } else {
+            PostLog(L"[INFO] ============ 自动操作终止 ============");
+        }
+        PostMessage(this->Hwnd(), WM_USER + 201, success ? 1 : 0, 0);
+    }
+    
+    // ---------- 日志 ----------
     
     void AddLog(const std::wstring& message) {
         // 只打印到窗口，不写日志文件
@@ -178,7 +394,31 @@ public:
                 UpdateStatus(L"已截图", L"", L"");
             }
             else if (sender->Name == "btnAutoAction") {
-                AddLog(L"[TODO] 自动操作功能尚未实现");
+                if (isAutoActionRunning.load()) {
+                    AddLog(L"[WARN] 自动操作正在进行中，请稍候...");
+                    return true;
+                }
+                if (!hasSelection || !hasStatusBarSelection) {
+                    AddLog(L"[WARN] 请先选择【窗口区域】和【状态栏区域】");
+                    return true;
+                }
+                
+                isAutoActionRunning.store(true);
+                sender->SetEnabled(false);
+                AddLog(L"[INFO] ============ 自动操作开始 ============");
+                AddLog(L"[INFO] 窗口区域: (" + std::to_wstring(selectedRectScreen.left) + L"," +
+                    std::to_wstring(selectedRectScreen.top) + L")-(" +
+                    std::to_wstring(selectedRectScreen.right) + L"," +
+                    std::to_wstring(selectedRectScreen.bottom) + L")");
+                AddLog(L"[INFO] 状态栏区域: (" + std::to_wstring(selectedStatusBarRect.left) + L"," +
+                    std::to_wstring(selectedStatusBarRect.top) + L")-(" +
+                    std::to_wstring(selectedStatusBarRect.right) + L"," +
+                    std::to_wstring(selectedStatusBarRect.bottom) + L")");
+                
+                // 启动后台线程执行自动操作
+                std::thread([this]() {
+                    RunAutoAction();
+                }).detach();
             }
             else if (sender->Name == "btnRecognize") {
                 // 如果正在识别，忽略点击
@@ -299,6 +539,59 @@ public:
             }
             return 0;
         }
+        else if (msg == WM_USER + 200) {
+            // 自动操作截图完成，触发手动识别
+            AddLog(L"[INFO] ===== 自动触发手动识别 =====");
+            // 模拟点击手动识别按钮
+            if (btnRecognize) {
+                // 直接调用识别逻辑
+                if (!isRecognizing.load()) {
+                    isRecognizing.store(true);
+                    btnRecognize->SetEnabled(false);
+                    UpdateStatus(L"识别中...", L"", L"");
+                    AddLog(L"[INFO] 开始识别目录: " + PathUtil::GetTodayFolderPath());
+                    
+                    std::thread([this]() {
+                        std::wstring dir = PathUtil::GetTodayFolderPath();
+                        std::string fileName;
+                        std::string fileContentHex;
+                        
+                        auto progressCallback = [this](int current, int total, const std::wstring& filePath) {
+                            size_t lastSlash = filePath.find_last_of(L"\\");
+                            std::wstring fileName = (lastSlash != std::wstring::npos) ? 
+                                filePath.substr(lastSlash + 1) : filePath;
+                            wchar_t progressMsg[512];
+                            swprintf_s(progressMsg, L"[INFO] 正在识别: %s (%d/%d)", 
+                                fileName.c_str(), current, total);
+                            PostMessage(this->Hwnd(), WM_USER + 101, 0,
+                                reinterpret_cast<LPARAM>(new std::wstring(progressMsg)));
+                        };
+                        
+                        std::string allHex = DrawGrid::RestoreFromFolder(dir, &fileName, &fileContentHex, progressCallback);
+                        
+                        PostMessage(this->Hwnd(), WM_USER + 100, 
+                            allHex.empty() || fileContentHex.empty() ? 0 : 1,
+                            reinterpret_cast<LPARAM>(new std::pair<std::string, std::string>(fileName, fileContentHex)));
+                    }).detach();
+                }
+            }
+            return 0;
+        }
+        else if (msg == WM_USER + 201) {
+            // 自动操作结束
+            bool success = (wParam == 1);
+            isAutoActionRunning.store(false);
+            auto* btnAutoAction = this->FindControl("btnAutoAction");
+            if (btnAutoAction) {
+                btnAutoAction->SetEnabled(true);
+            }
+            if (success) {
+                UpdateStatus(L"自动完成", L"", L"");
+            } else {
+                UpdateStatus(L"自动终止", L"", L"");
+            }
+            return 0;
+        }
         
         return __super::WndProc(msg, wParam, lParam);
     }
@@ -312,15 +605,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 {
     // 初始化GDI+
     DrawGrid::Inst()->InitGdiPlus();
-    
-    // 初始化 MNN OCR 引擎
-    // 自动搜索 exe 同目录下的 MNN_dbg.dll / MNN.dll
-    {
-        static MnnOcr s_ocr;
-        if (!s_ocr.load() || !s_ocr.init(4)) {
-            AppUtil::SaveLog("[MnnOcr] OCR engine init failed (MNN.dll not found?)");
-        }
-    }
     
     Application app;
     app.EnableHighDpi();
