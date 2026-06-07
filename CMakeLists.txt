@@ -43,6 +43,7 @@ set(PROJECT_HEADERS
     AppUtil.hpp
     DrawGrid.hpp
     AppConst.hpp
+    MnnOcr.hpp
     PathUtil.hpp
     ScreenCapture.hpp
     ScreenSelectOverlay.hpp

@@ -15,6 +15,7 @@
 #include "PathUtil.hpp"
 #include "ScreenSelectOverlay.hpp"
 #include "ScreenCapture.hpp"
+#include "MnnOcr.hpp"
 #include <fstream>
 #include <ctime>
 #include <thread>
@@ -311,6 +312,15 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 {
     // 初始化GDI+
     DrawGrid::Inst()->InitGdiPlus();
+    
+    // 初始化 MNN OCR 引擎
+    // 自动搜索 exe 同目录下的 MNN_dbg.dll / MNN.dll
+    {
+        static MnnOcr s_ocr;
+        if (!s_ocr.load() || !s_ocr.init(4)) {
+            AppUtil::SaveLog("[MnnOcr] OCR engine init failed (MNN.dll not found?)");
+        }
+    }
     
     Application app;
     app.EnableHighDpi();
