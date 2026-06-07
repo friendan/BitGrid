@@ -24,6 +24,9 @@ https://github.com/RapidAI/RapidOCR
 https://onnxruntime.ai
 https://modelscope.cn/models/RapidAI/RapidOCR/tree/master/mnn
 
+模型字典文件下载位置(在官方源码目录的位置)：
+https://github.com/PaddlePaddle/PaddleOCR/tree/release/3.5/ppocr/utils/dict
+ppocrv5_dict.txt
 
 ## 区域选择功能（2026-06-05）
 
