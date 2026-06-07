@@ -22,6 +22,8 @@ DIB 像素数据 → UpdateLayeredWindow → DWM 合成 → 屏幕
 https://github.com/forrestchang/andrej-karpathy-skills
 https://github.com/RapidAI/RapidOCR
 https://onnxruntime.ai
+https://modelscope.cn/models/RapidAI/RapidOCR/tree/master/mnn
+
 
 ## 区域选择功能（2026-06-05）
 
