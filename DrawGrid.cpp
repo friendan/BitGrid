@@ -325,6 +325,8 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
         }
     }
     
+    mHexCharNum = hexStringView.size();
+
     // AppUtil::SaveLog("[DrawHexStringToDIB] Completed: pixelsDrawn=", std::to_string(pixelsDrawn),
     //                  " finalX=", std::to_string(x), " finalY=", std::to_string(y));
 }
@@ -428,6 +430,7 @@ void DrawGrid::DrawHexString(HWND hwnd, HDC hdc){
 
     int xStart = lineOffset + lineCount;
     int yStart = lineOffset + lineCount;
+    mHexCharNum = hexStringView.size();
 
      // AppUtil::SaveLog("hexStringView:", hexStringView);
     // AppUtil::SaveLog("mWidth:", mWidth, " mHeight:", mHeight);

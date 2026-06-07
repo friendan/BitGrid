@@ -1674,6 +1674,7 @@ void snake::Application::UpdateDrawGridInfo(){
 	static size_t lastTotalPage = 0;
 	static size_t lastCurPage = 0;
 	static size_t lastFileSize = 0;
+	static size_t lastHexCharNum = 0;
 	
 	size_t curWidth = pDrawGrid->mDrawWidth;   // 绘图客户区宽度
 	size_t curHeight = pDrawGrid->mDrawHeight; // 绘图客户区高度
@@ -1681,6 +1682,7 @@ void snake::Application::UpdateDrawGridInfo(){
 	size_t curTotalPage = pDrawGrid->mTotalPage; // 总页数
 	size_t curCurPage = pDrawGrid->mCurPage;     // 当前是第N页
 	size_t curFileSize = AppUtil::DrawFileSize;  // 文件大小(单位：字节)
+	size_t curHexCharNum = pDrawGrid->mHexCharNum;  // 当前页有N个16进制字符
 	
 	wchar_t wszBuff[256] = {0};
 	
@@ -1711,13 +1713,14 @@ void snake::Application::UpdateDrawGridInfo(){
 	// 	lastFileSize = curFileSize;
 	// }
 
-    // 在状态栏的最后一格显示如下内容：文件大小 | 每页能显示的16进制字符数量 | 总页数 | 当前页
+    // 在状态栏的最后一格显示如下内容：文件大小 | 每页能显示的16进制字符数量 | 当前页有N个16进制字符 | 总页数 | 当前页
     // 只有数据变化时才更新
-    if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage) {
-        swprintf_s(wszBuff, L"%zu#%zu#%zu#%zu", curFileSize, curPageSize, curTotalPage, curCurPage);
+    if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage || curHexCharNum != lastHexCharNum) {
+        swprintf_s(wszBuff, L"%zu#%zu#%zu#%zu#%zu", curFileSize, curPageSize, curHexCharNum, curTotalPage, curCurPage);
         UpdateStatusBarText(5, wszBuff);
         lastFileSize = curFileSize;
         lastPageSize = curPageSize;
+        lastHexCharNum = curHexCharNum;
         lastTotalPage = curTotalPage;
         lastCurPage = curCurPage;
     }
