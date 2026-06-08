@@ -778,50 +778,50 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             // 遇到无效颜色（背景色），停止当前行，跳到下一行
             if (bit == 255) {
                 // 记录首尾几行的详细信息
-                if (y < yStart + 10 || y > yEnd - 10) {
-                    int r = GetRValue(rgbColor);
-                    int g = GetGValue(rgbColor);
-                    int b = GetBValue(rgbColor);
-                    int distBlack = r + g + b;
-                    int distWhite = (255-r) + (255-g) + (255-b);
-                    AppUtil::SaveLog("[RestoreFromImage] Row ", std::to_string(y), ": stopped at x=", std::to_string(x), 
-                                   ", pixels=", std::to_string(rowPixels),
-                                   ", color=RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
-                                   ", distBlack=", std::to_string(distBlack),
-                                   ", distWhite=", std::to_string(distWhite));
-                    
-                    // 如果这一行多识别了像素，记录前一个像素的信息
-                    if (logDetail && rowPixels >= (xEnd - xStart) - 3 && rowPixels < (xEnd - xStart)) {
-                        // 记录最后一个有效像素
-                        if (rowPixels > 0) {
-                            Gdiplus::Color lastColor;
-                            bitmap->GetPixel(x - 1, y, &lastColor);
-                            COLORREF lastRgb = ColorToRGB(lastColor);
-                            int lr = GetRValue(lastRgb);
-                            int lg = GetGValue(lastRgb);
-                            int lb = GetBValue(lastRgb);
-                            uint8_t lastBit = AppUtil::GetRgbColorBit(lastRgb);
-                            AppUtil::SaveLog("[RestoreFromImage]   -> Last valid pixel at x=", std::to_string(x-1),
-                                           ", RGB(", std::to_string(lr), ",", std::to_string(lg), ",", std::to_string(lb), ")",
-                                           ", bit=", std::to_string(lastBit));
-                        }
+                // if (y < yStart + 10 || y > yEnd - 10) {
+                //     int r = GetRValue(rgbColor);
+                //     int g = GetGValue(rgbColor);
+                //     int b = GetBValue(rgbColor);
+                //     int distBlack = r + g + b;
+                //     int distWhite = (255-r) + (255-g) + (255-b);
+                //     AppUtil::SaveLog("[RestoreFromImage] Row ", std::to_string(y), ": stopped at x=", std::to_string(x), 
+                //                    ", pixels=", std::to_string(rowPixels),
+                //                    ", color=RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
+                //                    ", distBlack=", std::to_string(distBlack),
+                //                    ", distWhite=", std::to_string(distWhite));
+                // }
+                
+                // 如果这一行多识别了像素，记录前一个像素的信息
+                if (logDetail && rowPixels >= (xEnd - xStart) - 3 && rowPixels < (xEnd - xStart)) {
+                    // 记录最后一个有效像素
+                    if (rowPixels > 0) {
+                        Gdiplus::Color lastColor;
+                        bitmap->GetPixel(x - 1, y, &lastColor);
+                        COLORREF lastRgb = ColorToRGB(lastColor);
+                        int lr = GetRValue(lastRgb);
+                        int lg = GetGValue(lastRgb);
+                        int lb = GetBValue(lastRgb);
+                        uint8_t lastBit = AppUtil::GetRgbColorBit(lastRgb);
+                        AppUtil::SaveLog("[RestoreFromImage]   -> Last valid pixel at x=", std::to_string(x-1),
+                                       ", RGB(", std::to_string(lr), ",", std::to_string(lg), ",", std::to_string(lb), ")",
+                                       ", bit=", std::to_string(lastBit));
                     }
                 }
                 break;  // 停止当前行
             }
             
             // 记录最后几行的每个像素（特别是接近边界的像素）
-            if (logDetail && rowPixels >= (xEnd - xStart) - 5) {
-                int r = GetRValue(rgbColor);
-                int g = GetGValue(rgbColor);
-                int b = GetBValue(rgbColor);
-                int distBlack = r + g + b;
-                AppUtil::SaveLog("[RestoreFromImage] DEBUG Row ", std::to_string(y), " x=", std::to_string(x),
-                               " pixel#", std::to_string(rowPixels),
-                               " RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
-                               " distBlack=", std::to_string(distBlack),
-                               " bit=", std::to_string(bit));
-            }
+            // if (logDetail && rowPixels >= (xEnd - xStart) - 5) {
+            //     int r = GetRValue(rgbColor);
+            //     int g = GetGValue(rgbColor);
+            //     int b = GetBValue(rgbColor);
+            //     int distBlack = r + g + b;
+            //     AppUtil::SaveLog("[RestoreFromImage] DEBUG Row ", std::to_string(y), " x=", std::to_string(x),
+            //                    " pixel#", std::to_string(rowPixels),
+            //                    " RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
+            //                    " distBlack=", std::to_string(distBlack),
+            //                    " bit=", std::to_string(bit));
+            // }
             
             rowPixels++;
             rowHasData = true;
