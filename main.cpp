@@ -494,6 +494,12 @@ public:
                 AddLog(L"[INFO] 已清理目录: " + dir);
                 UpdateStatus(L"已清理", L"", L"");
                 ClearLog();  // 清空日志窗口
+                // 重置状态
+                isAutoActionRunning.store(false);
+                isRecognizing.store(false);
+                auto* btnAutoAction = this->FindControl("btnAutoAction");
+                if (btnAutoAction) btnAutoAction->SetEnabled(true);
+                if (btnRecognize) btnRecognize->SetEnabled(true);
             }
             else if (sender->Name == "btnAbout") {
                 MessageBoxW(this->Hwnd(), L"BitGrid", L"关于", MB_OK);
