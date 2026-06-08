@@ -129,20 +129,31 @@ public:
             reinterpret_cast<LPARAM>(new std::wstring(msg)));
     }
     
-    /// 模拟按键（在当前焦点窗口发送按键消息）
+    /// 模拟按键（keybd_event + 正确 scan code）
     void SimulateKeyPress(int vkKey) {
-        // 先发送按键按下
-        keybd_event((BYTE)vkKey, 0, 0, 0);
+        BYTE scanCode = (BYTE)MapVirtualKeyA(vkKey, MAPVK_VK_TO_VSC);
+        // 按键按下
+        keybd_event((BYTE)vkKey, scanCode, 0, 0);
         Sleep(50);
-        // 再发送按键弹起
-        keybd_event((BYTE)vkKey, 0, KEYEVENTF_KEYUP, 0);
-        Sleep(200);  // 等待翻页完成
+        // 按键弹起
+        keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
+        Sleep(5000);  // 等待翻页完成（5秒）
     }
     
     /// 将鼠标移动到指定屏幕坐标
     void SimulateMouseMove(int x, int y) {
         SetCursorPos(x, y);
         Sleep(100);
+    }
+    
+    /// 模拟鼠标左键单击
+    void SimulateMouseClick() {
+        // 鼠标左键按下
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+        Sleep(50);
+        // 鼠标左键弹起
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+        Sleep(300);
     }
     
     /// OCR 识别状态栏区域并解析
@@ -285,10 +296,13 @@ public:
             // 2d. 翻页：鼠标移动到状态栏区域，按空格键
             // 使用状态栏区域中心位置
             int centerX = (selectedStatusBarRect.left + selectedStatusBarRect.right) / 2;
-            int centerY = (selectedStatusBarRect.top + selectedStatusBarRect.bottom) / 2;
+            int centerY = (selectedStatusBarRect.top + selectedStatusBarRect.bottom) / 2 - 50;
             PostLog(L"[INFO] 翻页：移动鼠标到 (" + std::to_wstring(centerX) + L"," + std::to_wstring(centerY) +
-                L") 并按下空格");
+                L")，单击激活后按空格");
             SimulateMouseMove(centerX, centerY);
+            // 单击激活窗口
+            SimulateMouseClick();
+            // 按空格翻页
             SimulateKeyPress(VK_SPACE);
         }
         
