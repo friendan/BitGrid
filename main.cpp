@@ -137,7 +137,7 @@ public:
         Sleep(50);
         // 按键弹起
         keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
-        Sleep(5000);  // 等待翻页完成（5秒）
+        // Sleep(2000);  // 等待翻页完成
     }
     
     /// 将鼠标移动到指定屏幕坐标
@@ -247,77 +247,52 @@ public:
         return actualChars == expectedHexChars;
     }
     
-    /// 自动操作主逻辑（在后台线程中运行）
+    /// 自动操作：截图1次 → 翻页 → 鼠标回到按钮
     void RunAutoAction() {
-        PostLog(L"[INFO] 自动操作线程已启动");
+        std::wstring dir = PathUtil::GetTodayFolderPath();
+        PathUtil::EnsureDirExists(dir);
         
-        // 第1步：OCR 识别状态栏，获取当前信息
-        PostLog(L"[INFO] ===== 第1步：识别状态栏 =====");
-        StatusBarInfo statusInfo = RecognizeStatusBar();
-        if (!statusInfo.valid) {
-            PostLog(L"[ERROR] 未识别到状态栏信息，流程终止");
+        std::wstring pngPath = CaptureToFile(selectedRectScreen, dir);
+        if (pngPath.empty()) {
+            PostLog(L"[ERROR] 截图失败，流程终止");
             FinishAutoAction(false);
             return;
         }
+        PostLog(L"[INFO] 已截图: " + pngPath);
         
-        size_t targetTotalPage = statusInfo.totalPage;
-        PostLog(L"[INFO] 共 " + std::to_wstring(targetTotalPage) + L" 页，从第 " +
-            std::to_wstring(statusInfo.curPage) + L" 页开始");
+        // 翻页：鼠标移到窗口区域中心，单击+空格
+        int centerX = (selectedRectScreen.left + selectedRectScreen.right) / 2;
+        int centerY = (selectedRectScreen.top + selectedRectScreen.bottom) / 2;
+        SimulateMouseMove(centerX, centerY);
+        SimulateMouseClick();
+        SimulateKeyPress(VK_SPACE);
         
-        // 创建截图目录，并清空旧截图
-        std::wstring dir = PathUtil::GetTodayFolderPath();
-        PathUtil::RemoveDirRecursive(dir);
-        PathUtil::EnsureDirExists(dir);
-        PostLog(L"[INFO] 已清空截图目录: " + dir);
-        
-        // 第2步：循环截图、翻页
-        for (size_t page = statusInfo.curPage; page <= targetTotalPage; page++) {
-            PostLog(L"[INFO] ===== 第 " + std::to_wstring(page) + L"/" + std::to_wstring(targetTotalPage) + L" 页 =====");
-            
-            // 2a. 截取窗口区域
-            PostLog(L"[INFO] 截取窗口区域...");
-            std::wstring pngPath = CaptureToFile(selectedRectScreen, dir);
-            if (pngPath.empty()) {
-                PostLog(L"[ERROR] 截图失败，流程终止");
-                FinishAutoAction(false);
-                return;
-            }
-            PostLog(L"[INFO] 已截图: " + pngPath);
-            
-            // 2b. 截图完成，记录日志
-            PostLog(L"[INFO] 截图完成");
-            
-            // 2c. 判断是否还有下一页
-            if (page >= targetTotalPage) {
-                PostLog(L"[INFO] 所有页面截图完成");
-                break;
-            }
-            
-            // 2d. 翻页：鼠标移动到状态栏区域，按空格键
-            // 使用状态栏区域中心位置
-            int centerX = (selectedStatusBarRect.left + selectedStatusBarRect.right) / 2;
-            int centerY = (selectedStatusBarRect.top + selectedStatusBarRect.bottom) / 2 - 50;
-            PostLog(L"[INFO] 翻页：移动鼠标到 (" + std::to_wstring(centerX) + L"," + std::to_wstring(centerY) +
-                L")，单击激活后按空格");
-            SimulateMouseMove(centerX, centerY);
-            // 单击激活窗口
-            SimulateMouseClick();
-            // 按空格翻页
-            SimulateKeyPress(VK_SPACE);
+        // 鼠标移回自动操作按钮
+        POINT btnPos = FindAutoActionBtnScreenPos();
+        if (btnPos.x != 0 || btnPos.y != 0) {
+            SimulateMouseMove(btnPos.x, btnPos.y);
         }
         
-        // 第3步：所有截图完成，触发手动识别
-        PostLog(L"[INFO] ===== 截图完成，触发手动识别 =====");
-        PostMessage(this->Hwnd(), WM_USER + 200, 0, 0);
+        FinishAutoAction(true);
+    }
+    
+    /// 查找自动操作按钮的屏幕坐标
+    POINT FindAutoActionBtnScreenPos() {
+        POINT pt = { 0, 0 };
+        auto* btn = this->FindControl("btnAutoAction");
+        if (btn) {
+            auto& r = btn->GetRect();
+            pt.x = r.X;
+            pt.y = r.Y;
+            ClientToScreen(this->Hwnd(), &pt);
+            pt.x += r.Width / 2;
+            pt.y += r.Height / 2;
+        }
+        return pt;
     }
     
     /// 结束自动操作（在后台线程中调用）
     void FinishAutoAction(bool success) {
-        if (success) {
-            PostLog(L"[INFO] ============ 自动操作完成 ============");
-        } else {
-            PostLog(L"[INFO] ============ 自动操作终止 ============");
-        }
         PostMessage(this->Hwnd(), WM_USER + 201, success ? 1 : 0, 0);
     }
     
@@ -412,22 +387,13 @@ public:
                     AddLog(L"[WARN] 自动操作正在进行中，请稍候...");
                     return true;
                 }
-                if (!hasSelection || !hasStatusBarSelection) {
-                    AddLog(L"[WARN] 请先选择【窗口区域】和【状态栏区域】");
+                if (!hasSelection) {
+                    AddLog(L"[WARN] 请先选择【窗口区域】");
                     return true;
                 }
                 
                 isAutoActionRunning.store(true);
                 sender->SetEnabled(false);
-                AddLog(L"[INFO] ============ 自动操作开始 ============");
-                AddLog(L"[INFO] 窗口区域: (" + std::to_wstring(selectedRectScreen.left) + L"," +
-                    std::to_wstring(selectedRectScreen.top) + L")-(" +
-                    std::to_wstring(selectedRectScreen.right) + L"," +
-                    std::to_wstring(selectedRectScreen.bottom) + L")");
-                AddLog(L"[INFO] 状态栏区域: (" + std::to_wstring(selectedStatusBarRect.left) + L"," +
-                    std::to_wstring(selectedStatusBarRect.top) + L")-(" +
-                    std::to_wstring(selectedStatusBarRect.right) + L"," +
-                    std::to_wstring(selectedStatusBarRect.bottom) + L")");
                 
                 // 启动后台线程执行自动操作
                 std::thread([this]() {
