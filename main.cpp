@@ -108,6 +108,13 @@ public:
             AppUtil::SaveLog("[MainFrm] OCR engine init failed");
         }
         
+        // 注册全局快捷键（Alt+F6/F7/F8 停止自动操作）
+        RegisterHotKey(this->Hwnd(), 100, MOD_ALT, VK_F6);
+        RegisterHotKey(this->Hwnd(), 101, MOD_ALT, VK_F7);
+        RegisterHotKey(this->Hwnd(), 102, MOD_ALT, VK_F8);
+        
+        AddLog(L"[INFO] Alt+F6/F7/F8 可停止自动操作");
+        
         UpdateStatus(L"就绪", L"", L"");
     }
     
@@ -138,7 +145,7 @@ public:
         Sleep(50);
         // 按键弹起
         keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
-        Sleep(300);  // 等待翻页完成
+        Sleep(1000);  // 等待翻页完成
     }
     
     /// 将鼠标移动到指定屏幕坐标
@@ -171,6 +178,12 @@ public:
         int centerY = (selectedRectScreen.top + selectedRectScreen.bottom) / 2;
         
         for (int page = 1; page <= totalPage; page++) {
+            // 检查是否被中断
+            if (!isAutoActionRunning.load()) {
+                PostLog(L"[INFO] 用户中断自动操作");
+                return;
+            }
+            
             // 截图
             std::wstring pngPath = CaptureToFile(selectedRectScreen, dir);
             if (pngPath.empty()) {
@@ -489,6 +502,19 @@ public:
                 UpdateStatus(L"自动完成", L"", L"");
             } else {
                 UpdateStatus(L"自动终止", L"", L"");
+            }
+            return 0;
+        }
+        else if (msg == WM_HOTKEY) {
+            // Alt+F6 / F7 / F8 停止自动操作
+            if (wParam >= 100 && wParam <= 102) {
+                if (isAutoActionRunning.load()) {
+                    isAutoActionRunning.store(false);
+                    auto* btnAutoAction = this->FindControl("btnAutoAction");
+                    if (btnAutoAction) btnAutoAction->SetEnabled(true);
+                    AddLog(L"[INFO] 用户中断，自动操作已停止");
+                    UpdateStatus(L"已中断", L"", L"");
+                }
             }
             return 0;
         }
