@@ -122,6 +122,7 @@ public:
                 AddLog(L"[INFO] 已从配置文件还原区域: (" +
                     std::to_wstring(*left) + L"," + std::to_wstring(*top) + L")-(" +
                     std::to_wstring(*right) + L"," + std::to_wstring(*bottom) + L")");
+                ScreenSelectOverlay::ShowBorder(selectedRectScreen);
             }
             
             // 还原总页数
@@ -371,6 +372,7 @@ public:
                         std::to_wstring(rc.right) + L"," + std::to_wstring(rc.bottom) + L")");
                     UpdateStatus(L"已选择", L"", L"");
                     SaveConfig();
+                    ScreenSelectOverlay::UpdateBorder(rc);
                 }
                 else {
                     AddLog(L"[WARN] 已取消选择");
@@ -480,6 +482,7 @@ public:
                 AddLog(L"[INFO] 已清理目录: " + dir);
                 UpdateStatus(L"已清理", L"", L"");
                 ClearLog();  // 清空日志窗口
+                ScreenSelectOverlay::HideBorder();
                 // 重置状态
                 isAutoActionRunning.store(false);
                 isRecognizing.store(false);

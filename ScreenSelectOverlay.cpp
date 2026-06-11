@@ -275,3 +275,173 @@ bool ScreenSelectOverlay::SelectRect(RECT& outRcScreen)
     return true;
 }
 
+// ==================== 持续显示选择框 ====================
+
+static HWND g_borderHwnd = nullptr;
+static HBITMAP g_borderDib = nullptr;
+static HDC g_borderMemdc = nullptr;
+static void* g_borderBits = nullptr;
+static int g_borderW = 0, g_borderH = 0;
+static RECT g_borderRect{};
+
+static void DrawBorderOnlyRGBA(void* bits, int w, int h, const RECT& rcLocal, int thickness)
+{
+    if (!bits) return;
+    // 清空为全透明
+    memset(bits, 0, size_t(w) * h * 4);
+    
+    RECT r = rcLocal;
+    auto clampi = [](LONG v, int lo, int hi) -> int {
+        if (v < lo) return lo;
+        if (v > hi) return hi;
+        return (int)v;
+    };
+    r.left = clampi(r.left, 0, w);
+    r.right = clampi(r.right, 0, w);
+    r.top = clampi(r.top, 0, h);
+    r.bottom = clampi(r.bottom, 0, h);
+    
+    if (r.right - r.left <= 1 || r.bottom - r.top <= 1) return;
+    
+    auto put = [&](int x, int y) {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        uint8_t* p = (uint8_t*)bits + (size_t(y) * w + size_t(x)) * 4;
+        p[0] = 0;     // B
+        p[1] = 255;   // G
+        p[2] = 0;     // R
+        p[3] = 255;   // A
+    };
+    
+    for (int t = 0; t < thickness; ++t) {
+        int left = r.left + t;
+        int right = r.right - 1 - t;
+        int top = r.top + t;
+        int bottom = r.bottom - 1 - t;
+        if (left >= right || top >= bottom) break;
+        for (int x = left; x <= right; ++x) {
+            put(x, top);
+            put(x, bottom);
+        }
+        for (int y = top; y <= bottom; ++y) {
+            put(left, y);
+            put(right, y);
+        }
+    }
+}
+
+static LRESULT CALLBACK BorderWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg) {
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        BeginPaint(hwnd, &ps);
+        
+        if (g_borderMemdc && g_borderHwnd) {
+            // 直接从 DC 更新分层窗口
+            HDC hdcScreen = GetDC(nullptr);
+            SIZE size{ g_borderW, g_borderH };
+            POINT src{ 0, 0 };
+            POINT dst{ g_borderRect.left, g_borderRect.top };
+            BLENDFUNCTION bf{};
+            bf.BlendOp = AC_SRC_OVER;
+            bf.SourceConstantAlpha = 255;
+            bf.AlphaFormat = AC_SRC_ALPHA;
+            UpdateLayeredWindow(hwnd, hdcScreen, &dst, &size, g_borderMemdc, &src, 0, &bf, ULW_ALPHA);
+            ReleaseDC(nullptr, hdcScreen);
+        }
+        
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    case WM_CLOSE:
+        DestroyWindow(hwnd);
+        return 0;
+    case WM_DESTROY:
+        g_borderHwnd = nullptr;
+        return 0;
+    default:
+        return DefWindowProcW(hwnd, msg, wParam, lParam);
+    }
+}
+
+void ScreenSelectOverlay::ShowBorder(const RECT& rcScreen)
+{
+    HideBorder();
+    
+    g_borderRect = rcScreen;
+    
+    WNDCLASSW wc{};
+    wc.lpfnWndProc = BorderWndProc;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"BitGridBorderOverlay";
+    RegisterClassW(&wc);
+    
+    g_borderHwnd = CreateWindowExW(
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,
+        wc.lpszClassName,
+        L"",
+        WS_POPUP,
+        rcScreen.left,
+        rcScreen.top,
+        rcScreen.right - rcScreen.left,
+        rcScreen.bottom - rcScreen.top,
+        nullptr,
+        nullptr,
+        wc.hInstance,
+        nullptr
+    );
+    if (!g_borderHwnd) return;
+    
+    int w = rcScreen.right - rcScreen.left;
+    int h = rcScreen.bottom - rcScreen.top;
+    if (w <= 0 || h <= 0) { DestroyWindow(g_borderHwnd); g_borderHwnd = nullptr; return; }
+    
+    BITMAPINFO bi{};
+    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = -h;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    
+    HDC hdcScreen = GetDC(nullptr);
+    g_borderMemdc = CreateCompatibleDC(hdcScreen);
+    g_borderDib = CreateDIBSection(hdcScreen, &bi, DIB_RGB_COLORS, &g_borderBits, nullptr, 0);
+    ReleaseDC(nullptr, hdcScreen);
+    
+    if (!g_borderMemdc || !g_borderDib || !g_borderBits) {
+        HideBorder();
+        return;
+    }
+    SelectObject(g_borderMemdc, g_borderDib);
+    
+    g_borderW = w;
+    g_borderH = h;
+    
+    // 计算边框的区域（相对于窗口左上角），框住整个窗口边缘
+    RECT borderLocal{ 0, 0, w, h };
+    DrawBorderOnlyRGBA(g_borderBits, w, h, borderLocal, 4);
+    
+    ShowWindow(g_borderHwnd, SW_SHOW);
+    
+    // 强制刷新
+    InvalidateRect(g_borderHwnd, nullptr, TRUE);
+    UpdateWindow(g_borderHwnd);
+}
+
+void ScreenSelectOverlay::HideBorder()
+{
+    if (g_borderMemdc) { DeleteDC(g_borderMemdc); g_borderMemdc = nullptr; }
+    if (g_borderDib) { DeleteObject(g_borderDib); g_borderDib = nullptr; }
+    g_borderBits = nullptr;
+    if (g_borderHwnd) { DestroyWindow(g_borderHwnd); g_borderHwnd = nullptr; }
+}
+
+void ScreenSelectOverlay::UpdateBorder(const RECT& rcScreen)
+{
+    if (g_borderHwnd) {
+        HideBorder();
+    }
+    ShowBorder(rcScreen);
+}
+
