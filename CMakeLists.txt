@@ -47,6 +47,7 @@ set(PROJECT_HEADERS
     PathUtil.hpp
     ScreenCapture.hpp
     ScreenSelectOverlay.hpp
+    toml.hpp
 )
 
 # 添加main.cpp作为主入口文件
