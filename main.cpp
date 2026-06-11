@@ -16,6 +16,7 @@
 #include "ScreenSelectOverlay.hpp"
 #include "ScreenCapture.hpp"
 #include "MnnOcr.hpp"
+#include "toml.hpp"
 #include <fstream>
 #include <ctime>
 #include <thread>
@@ -45,6 +46,36 @@ public:
         // AppUtil::SaveLog("[BitGrid] MainFrm constructor completed");
     }
     
+    /// 配置文件路径
+    std::wstring ConfigPath() {
+        return PathUtil::GetExeDir() + L"\\BitGrid.toml";
+    }
+    
+    /// 保存区域配置到文件
+    void SaveConfig() {
+        auto path = ConfigPath();
+        auto pathA = AppUtil::WStrToStr(path);
+        try {
+            toml::table tbl;
+            tbl.emplace("select_left", selectedRectScreen.left);
+            tbl.emplace("select_top", selectedRectScreen.top);
+            tbl.emplace("select_right", selectedRectScreen.right);
+            tbl.emplace("select_bottom", selectedRectScreen.bottom);
+            
+            // 保存总页数输入框的值
+            int totalPage = GetTotalPage();
+            tbl.emplace("total_page", totalPage);
+            
+            std::ofstream ofs(pathA);
+            if (ofs) {
+                ofs << tbl << std::endl;
+                AppUtil::SaveLog("[Config] Saved: ", pathA);
+            }
+        } catch (std::exception& e) {
+            AppUtil::SaveLog("[Config] Save error: ", e.what());
+        }
+    }
+    
     /// 获取总页数输入框的值
     int GetTotalPage() {
         auto* txt = (TextBox*)this->FindControl("txtTotalPage");
@@ -57,7 +88,53 @@ public:
             return 1;
         }
     }
-
+    
+    /// 设置总页数输入框的值
+    void SetTotalPage(int page) {
+        auto* txt = (TextBox*)this->FindControl("txtTotalPage");
+        if (txt) {
+            txt->SetText(std::to_wstring(page).c_str());
+        }
+    }
+    
+    /// 从文件读取配置
+    void LoadConfig() {
+        auto path = ConfigPath();
+        auto pathA = AppUtil::WStrToStr(path);
+        
+        std::ifstream ifs(pathA);
+        if (!ifs.is_open()) {
+            return;  // 配置文件不存在，不读取
+        }
+        
+        try {
+            auto tbl = toml::parse(ifs);
+            
+            auto left   = tbl["select_left"].value<int>();
+            auto top    = tbl["select_top"].value<int>();
+            auto right  = tbl["select_right"].value<int>();
+            auto bottom = tbl["select_bottom"].value<int>();
+            
+            if (left && top && right && bottom) {
+                selectedRectScreen = { *left, *top, *right, *bottom };
+                hasSelection = true;
+                
+                AddLog(L"[INFO] 已从配置文件还原区域: (" +
+                    std::to_wstring(*left) + L"," + std::to_wstring(*top) + L")-(" +
+                    std::to_wstring(*right) + L"," + std::to_wstring(*bottom) + L")");
+            }
+            
+            // 还原总页数
+            auto totalPage = tbl["total_page"].value<int>();
+            if (totalPage) {
+                SetTotalPage(*totalPage);
+                AddLog(L"[INFO] 已还原总页数: " + std::to_wstring(*totalPage));
+            }
+        } catch (std::exception& e) {
+            AppUtil::SaveLog("[Config] Load error: ", e.what());
+        }
+    }
+    
     void Init() {
         this->SetText(L"BitGrid");
         
@@ -114,6 +191,9 @@ public:
         RegisterHotKey(this->Hwnd(), 102, MOD_ALT, VK_F8);
         
         AddLog(L"[INFO] Alt+F6/F7/F8 可停止自动操作");
+        
+        // 读取配置文件
+        LoadConfig();
         
         UpdateStatus(L"就绪", L"", L"");
     }
@@ -290,6 +370,7 @@ public:
                     AddLog(L"[INFO] 已选择区域: (" + std::to_wstring(rc.left) + L"," + std::to_wstring(rc.top) + L")-(" +
                         std::to_wstring(rc.right) + L"," + std::to_wstring(rc.bottom) + L")");
                     UpdateStatus(L"已选择", L"", L"");
+                    SaveConfig();
                 }
                 else {
                     AddLog(L"[WARN] 已取消选择");
@@ -325,6 +406,9 @@ public:
                     return true;
                 }
                 
+                // 保存配置
+                SaveConfig();
+                
                 isAutoActionRunning.store(true);
                 sender->SetEnabled(false);
                 
@@ -334,6 +418,9 @@ public:
                 }).detach();
             }
             else if (sender->Name == "btnRecognize") {
+                // 保存配置
+                SaveConfig();
+                
                 // 如果正在识别，忽略点击
                 if (isRecognizing.load()) {
                     AddLog(L"[WARN] 识别正在进行中，请稍候...");
