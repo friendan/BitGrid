@@ -250,15 +250,37 @@ public:
         int totalPage = GetTotalPage();
         PostLog(L"[INFO] 总页数: " + std::to_wstring(totalPage));
         
-        // 清空并创建截图目录
+        // 创建截图目录（不清空，支持续传）
         std::wstring dir = PathUtil::GetTodayFolderPath();
-        PathUtil::RemoveDirRecursive(dir);
         PathUtil::EnsureDirExists(dir);
         
         int centerX = (selectedRectScreen.left + selectedRectScreen.right) / 2;
         int centerY = (selectedRectScreen.top + selectedRectScreen.bottom) / 2;
         
-        for (int page = 1; page <= totalPage; page++) {
+        // 获取目录中已有图片数量，从 N+1 开始
+        int startPage = 1;
+        std::wstring searchPath = dir + L"\\*.png";
+        WIN32_FIND_DATAW ffd;
+        HANDLE hFind = FindFirstFileW(searchPath.c_str(), &ffd);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            int maxNum = 0;
+            do {
+                std::wstring name = ffd.cFileName;
+                // 去掉 .png 后缀
+                if (name.size() > 4 && name.substr(name.size() - 4) == L".png") {
+                    std::wstring numStr = name.substr(0, name.size() - 4);
+                    try {
+                        int num = std::stoi(numStr);
+                        if (num > maxNum) maxNum = num;
+                    } catch (...) {}
+                }
+            } while (FindNextFileW(hFind, &ffd) != 0);
+            FindClose(hFind);
+            startPage = maxNum + 1;
+            PostLog(L"[INFO] 目录已有 " + std::to_wstring(maxNum) + L" 张截图，从第 " + std::to_wstring(startPage) + L" 张开始");
+        }
+        
+        for (int page = startPage; page < startPage + totalPage; page++) {
             // 检查是否被中断
             if (!isAutoActionRunning.load()) {
                 PostLog(L"[INFO] 用户中断自动操作");
@@ -272,10 +294,11 @@ public:
                 FinishAutoAction(false);
                 return;
             }
-            PostLog(L"[INFO] 已截图(" + std::to_wstring(page) + L"/" + std::to_wstring(totalPage) + L"): " + pngPath);
+            int pageIndex = page - startPage + 1;
+            PostLog(L"[INFO] 已截图(" + std::to_wstring(pageIndex) + L"/" + std::to_wstring(totalPage) + L"): " + pngPath);
             
             // 最后一页不翻页
-            if (page >= totalPage) break;
+            if (pageIndex >= totalPage) break;
             
             // 翻页：来回移动鼠标防止空闲（只移动不单击）
             for (int i = -20; i <= 20; i += 2) {
