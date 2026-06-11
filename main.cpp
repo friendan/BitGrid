@@ -145,7 +145,7 @@ public:
         Sleep(50);
         // 按键弹起
         keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
-        Sleep(1000);  // 等待翻页完成
+        Sleep(2000);  // 等待翻页完成
     }
     
     /// 将鼠标移动到指定屏幕坐标
@@ -196,12 +196,18 @@ public:
             // 最后一页不翻页
             if (page >= totalPage) break;
             
-            // 翻页：来回移动鼠标防止空闲
-            for (int i = -2; i <= 2; i++) {
+            // 翻页：来回移动鼠标防止空闲（只移动不单击）
+            for (int i = -20; i <= 20; i += 2) {
                 SetCursorPos(centerX + i, centerY);
-                Sleep(10);
+                Sleep(5);
             }
+            for (int i = 20; i >= -20; i -= 2) {
+                SetCursorPos(centerX + i, centerY);
+                Sleep(5);
+            }
+            // 单击激活窗口
             SimulateMouseClick();
+            Sleep(100);
             SimulateKeyPress(VK_SPACE);
         }
         
