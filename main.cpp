@@ -226,7 +226,7 @@ public:
         Sleep(50);
         // 按键弹起
         keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
-        Sleep(2000);  // 等待翻页完成
+        Sleep(3000);  // 等待翻页完成
     }
     
     /// 将鼠标移动到指定屏幕坐标
