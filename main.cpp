@@ -17,6 +17,7 @@
 #include "ScreenCapture.hpp"
 #include "MnnOcr.hpp"
 #include "toml.hpp"
+#include "picosha2.h"
 #include <fstream>
 #include <ctime>
 #include <thread>
@@ -218,6 +219,12 @@ public:
             reinterpret_cast<LPARAM>(new std::wstring(msg)));
     }
     
+    /// 在后台线程中更新状态栏右侧文本
+    void PostStatusRight(const std::wstring& msg) {
+        PostMessage(this->Hwnd(), WM_USER + 102, 0,
+            reinterpret_cast<LPARAM>(new std::wstring(msg)));
+    }
+    
     /// 模拟按键（keybd_event + 正确 scan code）
     void SimulateKeyPress(int vkKey) {
         BYTE scanCode = (BYTE)MapVirtualKeyA(vkKey, MAPVK_VK_TO_VSC);
@@ -226,7 +233,15 @@ public:
         Sleep(50);
         // 按键弹起
         keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
-        Sleep(3000);  // 等待翻页完成
+    }
+    
+    /// 计算文件的 SHA256
+    std::string CalcFileHash(const std::wstring& path) {
+        std::ifstream ifs(AppUtil::WStrToStr(path), std::ios::binary);
+        if (!ifs) return "";
+        return picosha2::hash256_hex_string(
+            std::istreambuf_iterator<char>(ifs),
+            std::istreambuf_iterator<char>());
     }
     
     /// 将鼠标移动到指定屏幕坐标
@@ -287,15 +302,21 @@ public:
                 return;
             }
             
-            // 截图
-            std::wstring pngPath = CaptureToFile(selectedRectScreen, dir);
-            if (pngPath.empty()) {
-                PostLog(L"[ERROR] 截图失败，流程终止");
+            // 截图（直接使用页码作为文件名，确保连续）
+            std::wstring pngPath = dir + L"\\" + std::to_wstring(page) + L".png";
+            std::wstring err;
+            if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, pngPath, &err)) {
+                PostLog(L"[ERROR] 截图失败: " + err);
                 FinishAutoAction(false);
                 return;
             }
             int pageIndex = page - startPage + 1;
             PostLog(L"[INFO] 已截图(" + std::to_wstring(pageIndex) + L"/" + std::to_wstring(totalPage) + L"): " + pngPath);
+            
+            // 提取文件名显示到状态栏
+            size_t lastSlash = pngPath.find_last_of(L"\\");
+            std::wstring shortName = (lastSlash != std::wstring::npos) ? pngPath.substr(lastSlash + 1) : pngPath;
+            PostStatusRight(shortName);
             
             // 最后一页不翻页
             if (pageIndex >= totalPage) break;
@@ -313,6 +334,49 @@ public:
             SimulateMouseClick();
             Sleep(100);
             SimulateKeyPress(VK_SPACE);
+            
+            // 等待翻页：每次等1秒后截图比对hash，最多5次
+            std::string lastPageHash;
+            // 获取上一张图（page-1）的hash作为比对基准
+            if (page > 1) {
+                std::wstring prevPath = dir + L"\\" + std::to_wstring(page - 1) + L".png";
+                // 上一张图可能不存在（续传时），不存在则跳过hash比对
+                std::ifstream prevIfs(AppUtil::WStrToStr(prevPath), std::ios::binary);
+                if (prevIfs) {
+                    lastPageHash = picosha2::hash256_hex_string(
+                        std::istreambuf_iterator<char>(prevIfs),
+                        std::istreambuf_iterator<char>());
+                }
+            }
+            
+            bool pageChanged = false;
+            for (int retry = 0; retry < 5; retry++) {
+                Sleep(1000);
+                std::wstring checkPath = dir + L"\\_wait_" + std::to_wstring(page) + L"_" + std::to_wstring(retry) + L".png";
+                std::wstring chkErr;
+                if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, checkPath, &chkErr)) {
+                    PostLog(L"[ERROR] 翻页验证截图失败: " + chkErr);
+                    FinishAutoAction(false);
+                    return;
+                }
+                std::string curHash = CalcFileHash(checkPath);
+                
+                if (lastPageHash.empty() || curHash != lastPageHash) {
+                    // hash变了，翻页成功，删掉临时文件
+                    DeleteFileW(checkPath.c_str());
+                    pageChanged = true;
+                    break;
+                }
+                // hash没变，删掉重复图
+                DeleteFileW(checkPath.c_str());
+                PostLog(L"[INFO] 翻页尚未完成，等待1秒重试(" + std::to_wstring(retry + 1) + L"/5)");
+            }
+            
+            if (!pageChanged) {
+                PostLog(L"[ERROR] 翻页超时5次仍未成功，流程终止");
+                FinishAutoAction(false);
+                return;
+            }
         }
         
         // 鼠标移回自动操作按钮
@@ -420,7 +484,10 @@ public:
                     return true;
                 }
                 AddLog(L"[INFO] 截图已保存: " + outPng);
-                UpdateStatus(L"已截图", L"", L"");
+                // 状态栏显示文件名
+                size_t lastSlash = outPng.find_last_of(L"\\");
+                std::wstring shortName = (lastSlash != std::wstring::npos) ? outPng.substr(lastSlash + 1) : outPng;
+                UpdateStatus(L"已截图", shortName, L"");
             }
             else if (sender->Name == "btnAutoAction") {
                 if (isAutoActionRunning.load()) {
@@ -562,6 +629,9 @@ public:
                 btnRecognize->SetEnabled(true);
             }
             
+            // 强制刷新状态栏和窗口
+            InvalidateRect(this->Hwnd(), nullptr, TRUE);
+            
             return 0;
         }
         else if (msg == WM_USER + 101) {
@@ -569,6 +639,16 @@ public:
             auto* pMsg = reinterpret_cast<std::wstring*>(lParam);
             if (pMsg) {
                 AddLog(*pMsg);
+                delete pMsg;
+            }
+            return 0;
+        }
+        else if (msg == WM_USER + 102) {
+            // 状态栏右侧更新消息
+            auto* pMsg = reinterpret_cast<std::wstring*>(lParam);
+            if (pMsg && statusRight) {
+                statusRight->SetText(*pMsg);
+                InvalidateRect(this->Hwnd(), nullptr, TRUE);
                 delete pMsg;
             }
             return 0;
