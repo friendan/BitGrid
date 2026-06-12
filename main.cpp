@@ -280,7 +280,7 @@ public:
             PostLog(L"[INFO] 目录已有 " + std::to_wstring(maxNum) + L" 张截图，从第 " + std::to_wstring(startPage) + L" 张开始");
         }
         
-        for (int page = startPage; page < startPage + totalPage; page++) {
+        for (int page = startPage; page <= totalPage; page++) {
             // 检查是否被中断
             if (!isAutoActionRunning.load()) {
                 PostLog(L"[INFO] 用户中断自动操作");
@@ -403,6 +403,7 @@ public:
                 }
             }
             else if (sender->Name == "btnShot") {
+                ScreenSelectOverlay::HideBorder();
                 if (!hasSelection) {
                     AddLog(L"[WARN] 请先点击\"选择\"框选区域");
                     return true;
@@ -431,6 +432,7 @@ public:
                     return true;
                 }
                 
+                ScreenSelectOverlay::HideBorder();
                 // 保存配置
                 SaveConfig();
                 

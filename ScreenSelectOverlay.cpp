@@ -66,7 +66,7 @@ static void DrawBorderRGBA(OverlayState* st, const RECT& rcLocal, int thickness)
         // BGRA
         uint8_t* p = (uint8_t*)st->bits + (size_t(y) * size_t(st->w) + size_t(x)) * 4;
         p[0] = 0;     // B
-        p[1] = 255;   // G
+        p[1] = 0;     // G
         p[2] = 0;     // R
         p[3] = 255;   // A
     };
@@ -307,7 +307,7 @@ static void DrawBorderOnlyRGBA(void* bits, int w, int h, const RECT& rcLocal, in
         if (x < 0 || y < 0 || x >= w || y >= h) return;
         uint8_t* p = (uint8_t*)bits + (size_t(y) * w + size_t(x)) * 4;
         p[0] = 0;     // B
-        p[1] = 255;   // G
+        p[1] = 0;     // G
         p[2] = 0;     // R
         p[3] = 255;   // A
     };
