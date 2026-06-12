@@ -350,8 +350,8 @@ public:
             }
             
             bool pageChanged = false;
-            for (int retry = 0; retry < 5; retry++) {
-                Sleep(1000);
+            for (int retry = 0; retry < 2; retry++) {
+                Sleep(3000);
                 std::wstring checkPath = dir + L"\\_wait_" + std::to_wstring(page) + L"_" + std::to_wstring(retry) + L".png";
                 std::wstring chkErr;
                 if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, checkPath, &chkErr)) {
@@ -369,11 +369,11 @@ public:
                 }
                 // hash没变，删掉重复图
                 DeleteFileW(checkPath.c_str());
-                PostLog(L"[INFO] 翻页尚未完成，等待1秒重试(" + std::to_wstring(retry + 1) + L"/5)");
+                PostLog(L"[INFO] 翻页尚未完成，等待3秒重试(" + std::to_wstring(retry + 1) + L"/2)");
             }
             
             if (!pageChanged) {
-                PostLog(L"[ERROR] 翻页超时5次仍未成功，流程终止");
+                PostLog(L"[ERROR] 翻页超时2次仍未成功，流程终止");
                 FinishAutoAction(false);
                 return;
             }
