@@ -498,10 +498,23 @@ public:
                     return true;
                 }
                 AddLog(L"[INFO] 截图已保存: " + outPng);
-                // 状态栏显示文件名
-                size_t lastSlash = outPng.find_last_of(L"\\");
-                std::wstring shortName = (lastSlash != std::wstring::npos) ? outPng.substr(lastSlash + 1) : outPng;
-                UpdateStatus(L"已截图", shortName, L"");
+                
+                // CRC32 校验
+                {
+                    std::string pageFileName;
+                    std::string pageContentHex;
+                    std::string pageData = DrawGrid::RestoreFromImage(outPng,
+                        &pageFileName, &pageContentHex, false);
+                    if (pageData.empty()) {
+                        AddLog(L"[ERROR] CRC32 校验失败，截图可能异常");
+                        UpdateStatus(L"截图异常", L"", L"");
+                    } else {
+                        // 状态栏显示文件名
+                        size_t lastSlash = outPng.find_last_of(L"\\");
+                        std::wstring shortName = (lastSlash != std::wstring::npos) ? outPng.substr(lastSlash + 1) : outPng;
+                        UpdateStatus(L"已截图", shortName, L"");
+                    }
+                }
             }
             else if (sender->Name == "btnAutoAction") {
                 if (isAutoActionRunning.load()) {
