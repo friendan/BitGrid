@@ -349,23 +349,17 @@ public:
             Sleep(100);
             SimulateKeyPress(VK_SPACE);
             
-            // 等待翻页：每次等1秒后截图比对hash，最多5次
-            std::string lastPageHash;
-            // 获取上一张图（page-1）的hash作为比对基准
+            // 等待翻页：动态递增等待时间（1s, 2s, 3s, 4s, 5s），使用 CRC32 校验
+            uint32_t lastPageCrc = 0;
             if (page > 1) {
-                std::wstring prevPath = dir + L"\\" + std::to_wstring(page - 1) + L".png";
-                // 上一张图可能不存在（续传时），不存在则跳过hash比对
-                std::ifstream prevIfs(AppUtil::WStrToStr(prevPath), std::ios::binary);
-                if (prevIfs) {
-                    lastPageHash = picosha2::hash256_hex_string(
-                        std::istreambuf_iterator<char>(prevIfs),
-                        std::istreambuf_iterator<char>());
-                }
+                lastPageCrc = AppUtil::Crc32File(dir + L"\\" + std::to_wstring(page - 1) + L".png");
             }
             
             bool pageChanged = false;
-            for (int retry = 0; retry < 2; retry++) {
-                Sleep(3000);
+            int waitMs = 1000;
+            for (int retry = 0; retry < 5; retry++) {
+                if (waitMs > 5000) waitMs = 5000;
+                Sleep(waitMs);
                 std::wstring checkPath = dir + L"\\_wait_" + std::to_wstring(page) + L"_" + std::to_wstring(retry) + L".png";
                 std::wstring chkErr;
                 if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, checkPath, &chkErr)) {
@@ -373,21 +367,50 @@ public:
                     FinishAutoAction(false);
                     return;
                 }
-                std::string curHash = CalcFileHash(checkPath);
                 
-                if (lastPageHash.empty() || curHash != lastPageHash) {
-                    // hash变了，翻页成功，删掉临时文件
+                uint32_t curCrc = AppUtil::Crc32File(checkPath);
+                
+                if (lastPageCrc == 0 || curCrc != lastPageCrc) {
+                    // CRC32 不同，可能翻页成功，再还原验证
+                    std::string pageFileName;
+                    std::string pageContentHex;
+                    std::string pageData = DrawGrid::RestoreFromImage(checkPath,
+                        &pageFileName, &pageContentHex, (page == 1));
+                    if (!pageData.empty()) {
+                        // 还原成功，翻页成功
+                        DeleteFileW(checkPath.c_str());
+                        pageChanged = true;
+                        break;
+                    }
+                    // 还原失败，删掉临时图，按 F5 刷新后继续等
                     DeleteFileW(checkPath.c_str());
+                    PostLog(L"[INFO] 翻页后截图还原CRC失败，按F5刷新重试");
+                    SimulateKeyPress(VK_F5);
+                    continue;
+                }
+                
+                // CRC32 相同，再用 SHA256 确认
+                std::string curHash = CalcFileHash(checkPath);
+                DeleteFileW(checkPath.c_str());
+                
+                // 获取上一张图的 hash
+                std::string lastHash;
+                std::wstring prevPath = dir + L"\\" + std::to_wstring(page - 1) + L".png";
+                if (page > 1) {
+                    lastHash = CalcFileHash(prevPath);
+                }
+                
+                if (lastHash.empty() || curHash != lastHash) {
                     pageChanged = true;
                     break;
                 }
-                // hash没变，删掉重复图
-                DeleteFileW(checkPath.c_str());
-                PostLog(L"[INFO] 翻页尚未完成，等待3秒重试(" + std::to_wstring(retry + 1) + L"/2)");
+                
+                waitMs += 500;
+                PostLog(L"[INFO] 翻页尚未完成，等待" + std::to_wstring(waitMs) + L"ms重试(" + std::to_wstring(retry + 1) + L"/5)");
             }
             
             if (!pageChanged) {
-                PostLog(L"[ERROR] 翻页超时2次仍未成功，流程终止");
+                PostLog(L"[ERROR] 翻页超时5次仍未成功，流程终止");
                 FinishAutoAction(false);
                 return;
             }
