@@ -1341,7 +1341,8 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 		break;
 	}
 	case VK_F5:{
-		this->CenterWindowOnMonitor(this->m_hwnd);
+		m_bForceRefresh = true;
+		onRenderWindow();
 		break;
 	}
 	case VK_F6:{
@@ -1661,7 +1662,7 @@ void snake::Application::UpdateWindowTitle()
 
 void snake::Application::UpdateDrawGridInfo(){
 	// 拖动窗口大小时不更新状态栏，避免闪烁
-	if (m_bIsSizing) {
+	if (m_bIsSizing && !m_bForceRefresh) {
 		return;
 	}
 	
@@ -1717,7 +1718,7 @@ void snake::Application::UpdateDrawGridInfo(){
 
     // 在状态栏的最后一格显示如下内容：文件大小 | 每页hex数 | 当前页hex数 | 当前页CRC32 | 总页数 | 当前页
     // 只有数据变化时才更新
-    if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage || curHexCharNum != lastHexCharNum || curCrc32 != lastCrc32) {
+    if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage || curHexCharNum != lastHexCharNum || curCrc32 != lastCrc32 || m_bForceRefresh) {
         swprintf_s(wszBuff, L"%zu#%zu#%zu#%08X#%zu#%zu", curFileSize, curPageSize, curHexCharNum, curCrc32, curTotalPage, curCurPage);
         UpdateStatusBarText(5, wszBuff);
         lastFileSize = curFileSize;
@@ -1726,6 +1727,7 @@ void snake::Application::UpdateDrawGridInfo(){
         lastCrc32 = curCrc32;
         lastTotalPage = curTotalPage;
         lastCurPage = curCurPage;
+        m_bForceRefresh = false;
     }
     
 

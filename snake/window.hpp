@@ -114,6 +114,7 @@ namespace snake
 		
 		// 窗口大小调整标志
 		bool m_bIsSizing{ false };
+		bool m_bForceRefresh{ false };  // F5 强制刷新状态栏
 
 
 		static LRESULT CALLBACK sp_winProc(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp) noexcept;
