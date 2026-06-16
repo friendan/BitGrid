@@ -407,3 +407,48 @@ uint8_t AppUtil::GetRgbColorBit(COLORREF rgbColor){
     return 255; // error
 }
 
+// CRC32 查表法实现
+static uint32_t s_crc32_table[256];
+static bool s_crc32_table_init = false;
+
+static void InitCrc32Table() {
+    for (uint32_t i = 0; i < 256; i++) {
+        uint32_t crc = i;
+        for (int j = 0; j < 8; j++) {
+            if (crc & 1)
+                crc = (crc >> 1) ^ 0xEDB88320;
+            else
+                crc >>= 1;
+        }
+        s_crc32_table[i] = crc;
+    }
+    s_crc32_table_init = true;
+}
+
+uint32_t AppUtil::Crc32(const void* data, size_t size) {
+    if (!s_crc32_table_init) InitCrc32Table();
+    uint32_t crc = 0xFFFFFFFF;
+    const uint8_t* bytes = (const uint8_t*)data;
+    for (size_t i = 0; i < size; i++) {
+        crc = s_crc32_table[(crc ^ bytes[i]) & 0xFF] ^ (crc >> 8);
+    }
+    return ~crc;
+}
+
+uint32_t AppUtil::Crc32File(const std::wstring& filePath) {
+    std::ifstream ifs(AppUtil::WStrToStr(filePath), std::ios::binary);
+    if (!ifs) return 0;
+    
+    char buf[65536];
+    uint32_t crc = 0xFFFFFFFF;
+    if (!s_crc32_table_init) InitCrc32Table();
+    
+    while (ifs.read(buf, sizeof(buf)) || ifs.gcount() > 0) {
+        std::streamsize n = ifs.gcount();
+        for (std::streamsize i = 0; i < n; i++) {
+            crc = s_crc32_table[(crc ^ (uint8_t)buf[i]) & 0xFF] ^ (crc >> 8);
+        }
+    }
+    return ~crc;
+}
+

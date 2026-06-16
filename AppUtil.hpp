@@ -137,4 +137,9 @@ public:
     static bool IsRgbColor(COLORREF rgbColor1, COLORREF rgbColor2);
     static uint8_t GetRgbColorBit(COLORREF rgbColor);
 
+    // 计算 CRC32
+    static uint32_t Crc32(const void* data, size_t size);
+    // 计算文件的 CRC32，失败返回 0
+    static uint32_t Crc32File(const std::wstring& filePath);
+
 };
