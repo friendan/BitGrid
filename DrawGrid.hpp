@@ -71,6 +71,7 @@ public:
 	size_t mDrawWidth = 0;
     size_t mDrawHeight = 0;
     size_t mHexCharNum = 0;
+    uint32_t mCurPageCrc32 = 0;  // 当前页 CRC32
     // std::string mHexString = "0123456789ABCDEF";
     std::string mHexString;
 

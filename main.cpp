@@ -318,6 +318,20 @@ public:
             std::wstring shortName = (lastSlash != std::wstring::npos) ? pngPath.substr(lastSlash + 1) : pngPath;
             PostStatusRight(shortName);
             
+            // CRC32 校验：还原截图并验证
+            {
+                std::string pageFileName;
+                std::string pageContentHex;
+                std::string pageData = DrawGrid::RestoreFromImage(pngPath,
+                    &pageFileName, &pageContentHex, (page == 1));
+                
+                if (pageData.empty()) {
+                    PostLog(L"[ERROR] CRC32 校验失败，截图可能异常，流程终止");
+                    FinishAutoAction(false);
+                    return;
+                }
+            }
+            
             // 最后一页不翻页
             if (pageIndex >= totalPage) break;
             

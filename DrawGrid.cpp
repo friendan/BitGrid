@@ -49,6 +49,9 @@ void DrawGrid::DrawInit(HWND hwnd, HDC hdc){
     // 只有在有数据时才计算 mPageSize，避免空数据时产生错误值
     if (!mHexString.empty()) {
         mPageSize = mDrawWidth*mDrawHeight / 4;
+        if (mPageSize > 8) {
+            mPageSize -= 8;  // 预留 8 个 hex 字符给每页末尾的 CRC32
+        }
         if(mPageSize > 0){
             mTotalPage = mHexString.size() / mPageSize;
             if(mHexString.size() % mPageSize != 0){
@@ -66,7 +69,6 @@ void DrawGrid::DrawInit(HWND hwnd, HDC hdc){
     }
 }
 
-// 为分层窗口初始化绘制参数
 void DrawGrid::DrawInitForDIB(int width, int height){
     mWidth = width;
     mHeight = height;
@@ -80,6 +82,9 @@ void DrawGrid::DrawInitForDIB(int width, int height){
     // 只有在有数据时才计算 mPageSize，避免空数据时产生错误值
     if (!mHexString.empty()) {
         mPageSize = mDrawWidth*mDrawHeight / 4;
+        if (mPageSize > 8) {
+            mPageSize -= 8;  // 预留 8 个 hex 字符给每页末尾的 CRC32
+        }
         if(mPageSize > 0){
             mTotalPage = mHexString.size() / mPageSize;
             if(mHexString.size() % mPageSize != 0){
@@ -326,6 +331,23 @@ void DrawGrid::DrawHexStringToDIB(uint32_t* pPixels, int width, int height) {
     }
     
     mHexCharNum = hexStringView.size();
+    
+    // 在每页末尾绘制 CRC32（8个hex字符 = 4字节）
+    {
+        mCurPageCrc32 = AppUtil::Crc32(hexStringView.data(), hexStringView.size());
+        std::string crcHex = AppUtil::UInt32ToHexStr(mCurPageCrc32);
+        for (char crcChar : crcHex) {
+            AppUtil::HexCharToBits(crcChar, bits);
+            for (int i = 0; i < 4; i++) {
+                if ((int)x >= xMax) {
+                    x = xStart;
+                    y += 1;
+                }
+                if ((int)y >= yMax) break;
+                pPixels[y * width + x++] = BitColorBGRA[bits[i]];
+            }
+        }
+    }
 
     // AppUtil::SaveLog("[DrawHexStringToDIB] Completed: pixelsDrawn=", std::to_string(pixelsDrawn),
     //                  " finalX=", std::to_string(x), " finalY=", std::to_string(y));
@@ -861,6 +883,31 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     }
     
     AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
+    
+    // 提取末尾 CRC32 并校验
+    std::string crcInfo;
+    if (result.size() >= 8) {
+        std::string crcHex = result.substr(result.size() - 8);
+        uint32_t storedCrc = AppUtil::HexStrToUInt32(crcHex);
+        std::string dataHex = result.substr(0, result.size() - 8);
+        uint32_t calcCrc = AppUtil::Crc32(dataHex.data(), dataHex.size());
+        
+        char crcBuf[32];
+        snprintf(crcBuf, sizeof(crcBuf), "[CRC32] stored=0x%08X calc=0x%08X", storedCrc, calcCrc);
+        crcInfo = std::string(crcBuf);
+        
+        if (storedCrc == calcCrc) {
+            crcInfo += " OK";
+            // 去掉末尾的 CRC32，只保留数据
+            result = dataHex;
+        } else {
+            crcInfo += " MISMATCH!";
+            AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
+            delete bitmap;
+            return "";
+        }
+        AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
+    }
     
     // 输出十六进制字符串长度和对应的字节数
     size_t resultLen = result.length();

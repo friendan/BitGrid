@@ -1346,7 +1346,7 @@ LRESULT snake::Application::onKeyPress(WPARAM wp, LPARAM lp) noexcept
 	}
 	case VK_F6:{
 		mPressF6Sum += 1;
-		if(mPressF6Sum >= 14){
+		if(mPressF6Sum >= 1){
 			mIsDrawGame = false;
 			mIsDrawGrid = true;
 			CreatePixelOverlay();
@@ -1675,6 +1675,7 @@ void snake::Application::UpdateDrawGridInfo(){
 	static size_t lastCurPage = 0;
 	static size_t lastFileSize = 0;
 	static size_t lastHexCharNum = 0;
+	static uint32_t lastCrc32 = 0;
 	
 	size_t curWidth = pDrawGrid->mDrawWidth;   // 绘图客户区宽度
 	size_t curHeight = pDrawGrid->mDrawHeight; // 绘图客户区高度
@@ -1683,6 +1684,7 @@ void snake::Application::UpdateDrawGridInfo(){
 	size_t curCurPage = pDrawGrid->mCurPage;     // 当前是第N页
 	size_t curFileSize = AppUtil::DrawFileSize;  // 文件大小(单位：字节)
 	size_t curHexCharNum = pDrawGrid->mHexCharNum;  // 当前页有N个16进制字符
+	uint32_t curCrc32 = pDrawGrid->mCurPageCrc32;    // 当前页 CRC32
 	
 	wchar_t wszBuff[256] = {0};
 	
@@ -1713,14 +1715,15 @@ void snake::Application::UpdateDrawGridInfo(){
 	// 	lastFileSize = curFileSize;
 	// }
 
-    // 在状态栏的最后一格显示如下内容：文件大小 | 每页能显示的16进制字符数量 | 当前页有N个16进制字符 | 总页数 | 当前页
+    // 在状态栏的最后一格显示如下内容：文件大小 | 每页hex数 | 当前页hex数 | 当前页CRC32 | 总页数 | 当前页
     // 只有数据变化时才更新
-    if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage || curHexCharNum != lastHexCharNum) {
-        swprintf_s(wszBuff, L"%zu#%zu#%zu#%zu#%zu", curFileSize, curPageSize, curHexCharNum, curTotalPage, curCurPage);
+    if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage || curHexCharNum != lastHexCharNum || curCrc32 != lastCrc32) {
+        swprintf_s(wszBuff, L"%zu#%zu#%zu#%08X#%zu#%zu", curFileSize, curPageSize, curHexCharNum, curCrc32, curTotalPage, curCurPage);
         UpdateStatusBarText(5, wszBuff);
         lastFileSize = curFileSize;
         lastPageSize = curPageSize;
         lastHexCharNum = curHexCharNum;
+        lastCrc32 = curCrc32;
         lastTotalPage = curTotalPage;
         lastCurPage = curCurPage;
     }
