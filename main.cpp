@@ -453,6 +453,12 @@ public:
             // 获取当前文本并追加新日志
             std::wstring currentText = AppUtil::StrToWStr(logBox->GetText().c_str());
             logBox->SetText((currentText + fullMessage).c_str());
+            
+            // 自动滚动到底部
+            auto* sb = logBox->GetScrollBar();
+            if (sb) {
+                sb->ScrollTo(1.0f);
+            }
         }
     }
     
@@ -645,6 +651,7 @@ public:
                 if (AppUtil::WriteHexStringToFile(fileContentHex, outPath)) {
                     AddLog(L"[INFO] 识别成功，已生成文件: " + outPath);
                     UpdateStatus(L"识别成功", L"", L"");
+                    DrawGrid::ClearPageCache();
                 } else {
                     AddLog(L"[ERROR] 写入还原文件失败: " + outPath);
                     UpdateStatus(L"识别失败", L"", L"");
