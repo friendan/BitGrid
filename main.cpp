@@ -278,8 +278,8 @@ public:
         
         uint32_t crc32 = AppUtil::Crc32File(path);
         std::string sha256 = CalcFileHash(path);
-        PostLog(L"[INFO] " + std::to_wstring(page) + L".png: CRC32=0x" + 
-            AppUtil::StrToWStr(AppUtil::UInt32ToHexStr(crc32)) + L" SHA256=" + AppUtil::StrToWStr(sha256));
+        AppUtil::SaveLog(AppUtil::WStrToStr(std::to_wstring(page) + L".png: CRC32=0x" + 
+            AppUtil::StrToWStr(AppUtil::UInt32ToHexStr(crc32)) + L" SHA256=" + AppUtil::StrToWStr(sha256)));
         
         return true;
     }
