@@ -230,7 +230,7 @@ public:
         BYTE scanCode = (BYTE)MapVirtualKeyA(vkKey, MAPVK_VK_TO_VSC);
         // 按键按下
         keybd_event((BYTE)vkKey, scanCode, 0, 0);
-        Sleep(50);
+        Sleep(10);
         // 按键弹起
         keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
     }
@@ -260,12 +260,19 @@ public:
             return false;
         }
         
-        // 不是第1张图片，要和上一张比较hash，防止重复截图
+        // 不是第1张图片，要和上一张比较还原后的数据，防止重复截图
         if (page > 1) {
-            std::wstring prevPath = dir + L"\\" + std::to_wstring(page - 1) + L".png";
-            std::string curHash = CalcFileHash(path);
-            std::string prevHash = CalcFileHash(prevPath);
-            if (!prevHash.empty() && curHash == prevHash) {
+            // 从缓存获取上一页的还原数据
+            std::string prevData;
+            {
+                std::wstring prevPath = dir + L"\\" + std::to_wstring(page - 1) + L".png";
+                std::string prevFileName;
+                std::string prevContentHex;
+                // 尝试从缓存获取，没有则从图片还原
+                auto tmp = DrawGrid::RestoreFromImage(prevPath, &prevFileName, &prevContentHex, (page - 1 == 1));
+                prevData = tmp;
+            }
+            if (!prevData.empty() && pageData == prevData) {
                 //PostLog(L"[ERROR] 截图与上一张相同，翻页未成功");
                 return false;
             }
@@ -316,14 +323,13 @@ public:
     /// 将鼠标移动到指定屏幕坐标
     void SimulateMouseMove(int x, int y) {
         SetCursorPos(x, y);
-        Sleep(100);
     }
     
     /// 模拟鼠标左键单击
     void SimulateMouseClick() {
         // 鼠标左键按下
         mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-        Sleep(50);
+        Sleep(30);
         // 鼠标左键弹起
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
     }
@@ -332,11 +338,11 @@ public:
     void SimulatePageTurn(int centerX, int centerY) {
         for (int i = -20; i <= 20; i += 5) {
             SetCursorPos(centerX + i, centerY);
-            Sleep(3);
-        }
-        for (int i = 20; i >= -20; i -= 5) {
-            SetCursorPos(centerX + i, centerY);
-            Sleep(3);
+            Sleep(1);
+            }
+            for (int i = 20; i >= -20; i -= 5) {
+                SetCursorPos(centerX + i, centerY);
+                Sleep(1);
         }
         SimulateMouseClick();
         SimulateKeyPress(VK_SPACE);
@@ -377,7 +383,7 @@ public:
                     FinishAutoAction(false);
                     return;
                 }
-                Sleep(100);
+                Sleep(30);
                 continue;
             }
             
@@ -392,7 +398,6 @@ public:
             // 翻页
             SimulatePageTurn(centerX, centerY);
             page++;
-            Sleep(100);
         }
         
         // 鼠标移回自动操作按钮
