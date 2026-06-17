@@ -744,9 +744,9 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         } catch (...) {}
     }
     
-    AppUtil::SaveLog("[RestoreFromImage] Start");
+    //AppUtil::SaveLog("[RestoreFromImage] Start");
     AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
-    AppUtil::SaveLog("[RestoreFromImage] isFirstPage: ", isFirstPage ? "true" : "false");
+    //AppUtil::SaveLog("[RestoreFromImage] isFirstPage: ", isFirstPage ? "true" : "false");
     
     // 加载图片
     Gdiplus::Bitmap* bitmap = Gdiplus::Bitmap::FromFile(imagePath.c_str());
@@ -765,22 +765,22 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     
     // 查找边框位置
     int left, top, right, bottom;
-    AppUtil::SaveLog("[RestoreFromImage] Finding border...");
+    //AppUtil::SaveLog("[RestoreFromImage] Finding border...");
     if (!FindBorder(bitmap, left, top, right, bottom)) {
         AppUtil::SaveLog("[RestoreFromImage] FindBorder failed");
         delete bitmap;
         return result;
     }
     
-    AppUtil::SaveLog("[RestoreFromImage] Border found: left=", std::to_string(left), 
-                     " top=", std::to_string(top), 
-                     " right=", std::to_string(right), 
-                     " bottom=", std::to_string(bottom));
+    //AppUtil::SaveLog("[RestoreFromImage] Border found: left=", std::to_string(left), 
+    //                 " top=", std::to_string(top), 
+    //                 " right=", std::to_string(right), 
+    //                 " bottom=", std::to_string(bottom));
     
     const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
     const static int& lineCount = AppConst::BORDER_LINE_COUNT;
     
-    AppUtil::SaveLog("[RestoreFromImage] lineOffset=", std::to_string(lineOffset), " lineCount=", std::to_string(lineCount));
+   // AppUtil::SaveLog("[RestoreFromImage] lineOffset=", std::to_string(lineOffset), " lineCount=", std::to_string(lineCount));
     
     // 计算真实绘制区域（去掉边框）
     // 边框有lineCount条线，数据从边框内侧开始
@@ -789,15 +789,15 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     int xEnd = right - lineCount + 1;
     int yEnd = bottom - lineCount + 1;
     
-    AppUtil::SaveLog("[RestoreFromImage] Draw area: xStart=", std::to_string(xStart), 
-                     " yStart=", std::to_string(yStart), 
-                     " xEnd=", std::to_string(xEnd), 
-                     " yEnd=", std::to_string(yEnd));
+    //AppUtil::SaveLog("[RestoreFromImage] Draw area: xStart=", std::to_string(xStart), 
+    //                 " yStart=", std::to_string(yStart), 
+    //                 " xEnd=", std::to_string(xEnd), 
+    //                 " yEnd=", std::to_string(yEnd));
     
     int drawWidth = xEnd - xStart;
     int drawHeight = yEnd - yStart;
     
-    AppUtil::SaveLog("[RestoreFromImage] Draw size: ", std::to_string(drawWidth), " x ", std::to_string(drawHeight));
+    //AppUtil::SaveLog("[RestoreFromImage] Draw size: ", std::to_string(drawWidth), " x ", std::to_string(drawHeight));
     
     if (drawWidth <= 0 || drawHeight <= 0) {
         AppUtil::SaveLog("[RestoreFromImage] Invalid draw size");
@@ -809,7 +809,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     uint8_t bits[4] = {0};
     int bitIndex = 0;
     int totalPixels = 0;
-    AppUtil::SaveLog("[RestoreFromImage] Starting pixel processing...");
+    //AppUtil::SaveLog("[RestoreFromImage] Starting pixel processing...");
     
     int maxPixelsPerRow = 0;
     int minPixelsPerRow = xEnd - xStart;  // 初始化为最大值
@@ -857,9 +857,9 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
                         int lg = GetGValue(lastRgb);
                         int lb = GetBValue(lastRgb);
                         uint8_t lastBit = AppUtil::GetRgbColorBit(lastRgb);
-                        AppUtil::SaveLog("[RestoreFromImage]   -> Last valid pixel at x=", std::to_string(x-1),
-                                       ", RGB(", std::to_string(lr), ",", std::to_string(lg), ",", std::to_string(lb), ")",
-                                       ", bit=", std::to_string(lastBit));
+                        //AppUtil::SaveLog("[RestoreFromImage]   -> Last valid pixel at x=", std::to_string(x-1),
+                        //               ", RGB(", std::to_string(lr), ",", std::to_string(lg), ",", std::to_string(lb), ")",
+                        //               ", bit=", std::to_string(lastBit));
                     }
                 }
                 break;  // 停止当前行
@@ -897,13 +897,13 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         }
     }
     
-    AppUtil::SaveLog("[RestoreFromImage] Pixel processing done");
-    AppUtil::SaveLog("[RestoreFromImage] bitIndex: ", std::to_string(bitIndex));
-    AppUtil::SaveLog("[RestoreFromImage] Statistics: totalRows=", std::to_string(totalRows),
-                     ", rowsWithPixels=", std::to_string(rowsWithPixels),
-                     ", maxPixelsPerRow=", std::to_string(maxPixelsPerRow),
-                     ", minPixelsPerRow=", std::to_string(minPixelsPerRow),
-                     ", expectedWidth=", std::to_string(xEnd - xStart));
+    //AppUtil::SaveLog("[RestoreFromImage] Pixel processing done");
+    //AppUtil::SaveLog("[RestoreFromImage] bitIndex: ", std::to_string(bitIndex));
+    //AppUtil::SaveLog("[RestoreFromImage] Statistics: totalRows=", std::to_string(totalRows),
+    //                 ", rowsWithPixels=", std::to_string(rowsWithPixels),
+    //                 ", maxPixelsPerRow=", std::to_string(maxPixelsPerRow),
+    //                 ", minPixelsPerRow=", std::to_string(minPixelsPerRow),
+    //                 ", expectedWidth=", std::to_string(xEnd - xStart));
     
     // 处理剩余的bits（不足4个时用0填充）
     if (bitIndex > 0) {
@@ -915,7 +915,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         result += AppUtil::BitsToHexChar(bits);
     }
     
-    AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
+    //AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
     
     // 提取末尾 CRC32 并校验
     std::string crcInfo;
@@ -950,7 +950,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     AppUtil::SaveLog("[RestoreFromImage] Result hex length: ", std::to_string(resultLen), " bytes (", std::string(hexBuf1), ") [", std::to_string(resultBytes), " data bytes]");
         
     delete bitmap;
-    AppUtil::SaveLog("[RestoreFromImage] End");
+    //AppUtil::SaveLog("[RestoreFromImage] End");
 
     // 解析新格式：文件名长度(8hex) + 文件名(512hex) + 文件内容长度(8hex) + 文件内容
     std::string fileContentHex = result;
@@ -1007,7 +1007,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         }
     } else if (!isFirstPage) {
         // 非第一页：所有数据都是文件内容
-        AppUtil::SaveLog("[RestoreFromImage] Non-first page, all data is file content");
+        //AppUtil::SaveLog("[RestoreFromImage] Non-first page, all data is file content");
         size_t contentLen = fileContentHex.length();
         size_t contentBytes = contentLen / 2;
         char hexBuf2[16];
