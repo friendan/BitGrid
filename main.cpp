@@ -248,16 +248,15 @@ public:
     bool CaptureAndVerify(const std::wstring& path, const std::wstring& dir, int page, int totalPage) {
         std::wstring err;
         if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, path, &err)) {
-            PostLog(L"[ERROR] 截图失败: " + err);
+            //PostLog(L"[ERROR] 截图失败: " + err);
             return false;
         }
-        PostLog(L"[INFO] 已截图(" + std::to_wstring(page) + L"/" + std::to_wstring(totalPage) + L"): " + path);
         
         std::string pageFileName, pageContentHex;
         std::string pageData = DrawGrid::RestoreFromImage(path,
             &pageFileName, &pageContentHex, (page == 1));
         if (pageData.empty()) {
-            PostLog(L"[ERROR] CRC32 校验失败，截图可能异常");
+            //PostLog(L"[ERROR] CRC32 校验失败，截图可能异常");
             return false;
         }
         
@@ -267,10 +266,12 @@ public:
             std::string curHash = CalcFileHash(path);
             std::string prevHash = CalcFileHash(prevPath);
             if (!prevHash.empty() && curHash == prevHash) {
-                PostLog(L"[ERROR] 截图与上一张相同，翻页未成功");
+                //PostLog(L"[ERROR] 截图与上一张相同，翻页未成功");
                 return false;
             }
         }
+        
+        PostLog(L"[INFO] 已截图(" + std::to_wstring(page) + L"/" + std::to_wstring(totalPage) + L"): " + path);
         
         // 所有验证通过，设置缓存
         DrawGrid::SetPageCache(page, pageData);
@@ -370,7 +371,7 @@ public:
             std::wstring pngPath = dir + L"\\" + std::to_wstring(page) + L".png";
             if (!CaptureAndVerify(pngPath, dir, page, totalPage)) {
                 errorCount++;
-                PostLog(L"[INFO] CRC校验失败(" + std::to_wstring(errorCount) + L"/" + std::to_wstring(maxErrors) + L"), 等待100ms重试");
+                //PostLog(L"[INFO] CRC校验失败(" + std::to_wstring(errorCount) + L"/" + std::to_wstring(maxErrors) + L"), 等待100ms重试");
                 if (errorCount >= maxErrors) {
                     PostLog(L"[ERROR] CRC校验连续失败" + std::to_wstring(maxErrors) + L"次，流程终止");
                     FinishAutoAction(false);
@@ -384,7 +385,7 @@ public:
             errorCount = 0;
             
             if (page >= totalPage) {
-                PostLog(L"[INFO] 所有页面截图完成");
+                //PostLog(L"[INFO] 所有页面截图完成");
                 break;
             }
             
