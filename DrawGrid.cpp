@@ -711,6 +711,39 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     if (outFileName) outFileName->clear();
     if (outFileContentHex) outFileContentHex->clear();
     
+    // 优先使用缓存（从文件名提取页码）
+    std::wstring fileName = imagePath.substr(imagePath.find_last_of(L"\\") + 1);
+    size_t dotPos = fileName.find_last_of(L'.');
+    if (dotPos != std::wstring::npos) {
+        std::wstring pageStr = fileName.substr(0, dotPos);
+        try {
+            int page = std::stoi(pageStr);
+            auto it = s_pageCache.find(page);
+            if (it != s_pageCache.end()) {
+                result = it->second;
+                // 第一页需要解析文件名和内容
+                if (isFirstPage && result.size() >= 528) {
+                    if (outFileName && result.size() >= 528) {
+                        std::string nameHex = result.substr(8, 512);
+                        std::string name = AppUtil::HexStrToStr(nameHex);
+                        while (!name.empty() && name.back() == '0') name.pop_back();
+                        if (!name.empty()) *outFileName = name;
+                    }
+                    std::string contentHex = result.substr(528);
+                    std::string clHex = result.substr(520, 8);
+                    uint32_t contentLen = AppUtil::HexStrToUInt32(clHex);
+                    if (contentHex.length() > (size_t)contentLen * 2) {
+                        contentHex = contentHex.substr(0, (size_t)contentLen * 2);
+                    }
+                    if (outFileContentHex) *outFileContentHex = contentHex;
+                } else if (!isFirstPage) {
+                    if (outFileContentHex) *outFileContentHex = result;
+                }
+                return result;
+            }
+        } catch (...) {}
+    }
+    
     AppUtil::SaveLog("[RestoreFromImage] Start");
     AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
     AppUtil::SaveLog("[RestoreFromImage] isFirstPage: ", isFirstPage ? "true" : "false");
@@ -1134,5 +1167,16 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
     }
     
     return result;
+}
+
+// ============= 页缓存 =============
+std::map<int, std::string> DrawGrid::s_pageCache;
+
+void DrawGrid::SetPageCache(int page, const std::string& data) {
+    s_pageCache[page] = data;
+}
+
+void DrawGrid::ClearPageCache() {
+    s_pageCache.clear();
 }
 

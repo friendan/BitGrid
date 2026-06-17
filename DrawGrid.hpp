@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <cstdint>  // 必须包含，用于uint8_t
 #include <string>
+#include <map>
 #include <gdiplus.h>
 #include <functional>
 
@@ -62,6 +63,10 @@ public:
 	                                      std::string* outFileContentHex = nullptr,
 	                                      std::function<void(int, int, const std::wstring&)> progressCallback = nullptr);
 
+	// 设置/获取页缓存（页码 → 还原后的hex数据），RestoreFromFolder 会优先使用缓存
+	static void SetPageCache(int page, const std::string& data);
+	static void ClearPageCache();
+
 public:
 	size_t mWidth = 0;
 	size_t mHeight = 0;
@@ -79,6 +84,9 @@ private:
     // GDI+ 全局变量
     Gdiplus::GdiplusStartupInput gdiplusStartupInput{};
     ULONG_PTR gdiplusToken = NULL;
+    
+    // 页缓存：页码 → 还原后的hex数据
+    static std::map<int, std::string> s_pageCache;
     
     
 };

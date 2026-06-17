@@ -39,7 +39,7 @@ private:
     std::atomic<bool> isRecognizing{false};  // 是否正在识别
     std::atomic<bool> isAutoActionRunning{false};  // 自动操作是否正在运行
     MnnOcr m_ocr;  // OCR 引擎
-    
+
 public:
     MainFrm(int width, int height) : Window(width, height) {
         // AppUtil::SaveLog("[BitGrid] MainFrm constructor started");
@@ -272,6 +272,9 @@ public:
             }
         }
         
+        // 所有验证通过，设置缓存
+        DrawGrid::SetPageCache(page, pageData);
+        
         size_t ls = path.find_last_of(L"\\");
         std::wstring sn = (ls != std::wstring::npos) ? path.substr(ls + 1) : path;
         PostStatusRight(sn);
@@ -340,6 +343,7 @@ public:
 
     /// 自动操作：循环截图 + 翻页 + 触发识别
     void RunAutoAction() {
+        DrawGrid::ClearPageCache();
         int totalPage = GetTotalPage();
         PostLog(L"[INFO] 总页数: " + std::to_wstring(totalPage));
         
