@@ -581,14 +581,14 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     int height = bitmap->GetHeight();
     const int lineCount = AppConst::BORDER_LINE_COUNT;
     
-    AppUtil::SaveLog("[FindBorder] Start, image size: ", std::to_string(width), " x ", std::to_string(height));
-    AppUtil::SaveLog("[FindBorder] BORDER_LINE_COUNT: ", std::to_string(lineCount));
-    AppUtil::SaveLog("[FindBorder] BORDER_COLOR: ", std::to_string(AppConst::BORDER_COLOR));
-    AppUtil::SaveLog("[FindBorder] COLOR_THRESHOLD: ", std::to_string(AppConst::COLOR_THRESHOLD));
+    //AppUtil::SaveLog("[FindBorder] Start, image size: ", std::to_string(width), " x ", std::to_string(height));
+    //AppUtil::SaveLog("[FindBorder] BORDER_LINE_COUNT: ", std::to_string(lineCount));
+    //AppUtil::SaveLog("[FindBorder] BORDER_COLOR: ", std::to_string(AppConst::BORDER_COLOR));
+    //AppUtil::SaveLog("[FindBorder] COLOR_THRESHOLD: ", std::to_string(AppConst::COLOR_THRESHOLD));
     
     // 从左边缘查找连续的BORDER_LINE_COUNT条垂直边框线
     left = -1;
-    AppUtil::SaveLog("[FindBorder] Searching left border...");
+    //AppUtil::SaveLog("[FindBorder] Searching left border...");
     for (int x = 0; x <= width - lineCount && left < 0; x++) {
         bool found = true;
         for (int i = 0; i < lineCount; i++) {
@@ -599,7 +599,7 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
         }
         if (found) {
             left = x;
-            AppUtil::SaveLog("[FindBorder] Left border found at x=", std::to_string(x));
+            //AppUtil::SaveLog("[FindBorder] Left border found at x=", std::to_string(x));
             break;
         }
     }
@@ -656,11 +656,11 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     }
     
     // 验证是否找到所有边框
-    AppUtil::SaveLog("[FindBorder] left=", std::to_string(left)
-        , " right=", std::to_string(right)
-        , " top=", std::to_string(top)
-        , " bottom=", std::to_string(bottom)
-    );
+    // AppUtil::SaveLog("[FindBorder] left=", std::to_string(left)
+    //     , " right=", std::to_string(right)
+    //     , " top=", std::to_string(top)
+    //     , " bottom=", std::to_string(bottom)
+    // );
     
     if (left < 0 || right < 0 || top < 0 || bottom < 0) {
         AppUtil::SaveLog("[FindBorder] Failed: some border not found");
@@ -689,7 +689,7 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
         return false;
     }
     
-    AppUtil::SaveLog("[FindBorder] Success");
+    //AppUtil::SaveLog("[FindBorder] Success");
     return true;
 }
 
@@ -761,7 +761,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     
     int width = bitmap->GetWidth();
     int height = bitmap->GetHeight();
-    AppUtil::SaveLog("[RestoreFromImage] Image size: ", std::to_string(width), " x ", std::to_string(height));
+    //AppUtil::SaveLog("[RestoreFromImage] Image size: ", std::to_string(width), " x ", std::to_string(height));
     
     // 查找边框位置
     int left, top, right, bottom;
@@ -939,7 +939,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             delete bitmap;
             return "";
         }
-        AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
+        //AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
     }
     
     // 输出十六进制字符串长度和对应的字节数
