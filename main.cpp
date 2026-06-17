@@ -316,21 +316,19 @@ public:
         Sleep(50);
         // 鼠标左键弹起
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-        Sleep(300);
     }
     
     /// 模拟翻页：来回移动鼠标防止空闲，再按空格翻页
     void SimulatePageTurn(int centerX, int centerY) {
-        for (int i = -20; i <= 20; i += 2) {
+        for (int i = -20; i <= 20; i += 5) {
             SetCursorPos(centerX + i, centerY);
-            Sleep(5);
+            Sleep(3);
         }
-        for (int i = 20; i >= -20; i -= 2) {
+        for (int i = 20; i >= -20; i -= 5) {
             SetCursorPos(centerX + i, centerY);
-            Sleep(5);
+            Sleep(3);
         }
         SimulateMouseClick();
-        Sleep(100);
         SimulateKeyPress(VK_SPACE);
     }
 
