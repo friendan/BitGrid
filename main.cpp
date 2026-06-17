@@ -244,6 +244,65 @@ public:
             std::istreambuf_iterator<char>());
     }
     
+    /// 截图并校验，成功返回 true，失败则内部自动终止流程
+    bool CaptureAndVerify(const std::wstring& path, const std::wstring& dir, int page, int totalPage) {
+        std::wstring err;
+        if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, path, &err)) {
+            PostLog(L"[ERROR] 截图失败: " + err);
+            return false;
+        }
+        PostLog(L"[INFO] 已截图(" + std::to_wstring(page) + L"/" + std::to_wstring(totalPage) + L"): " + path);
+        
+        std::string pageFileName, pageContentHex;
+        std::string pageData = DrawGrid::RestoreFromImage(path,
+            &pageFileName, &pageContentHex, (page == 1));
+        if (pageData.empty()) {
+            PostLog(L"[ERROR] CRC32 校验失败，截图可能异常");
+            return false;
+        }
+        
+        // 不是第1张图片，要和上一张比较hash，防止重复截图
+        if (page > 1) {
+            std::wstring prevPath = dir + L"\\" + std::to_wstring(page - 1) + L".png";
+            std::string curHash = CalcFileHash(path);
+            std::string prevHash = CalcFileHash(prevPath);
+            if (!prevHash.empty() && curHash == prevHash) {
+                PostLog(L"[ERROR] 截图与上一张相同，翻页未成功");
+                return false;
+            }
+        }
+        
+        size_t ls = path.find_last_of(L"\\");
+        std::wstring sn = (ls != std::wstring::npos) ? path.substr(ls + 1) : path;
+        PostStatusRight(sn);
+        return true;
+    }
+    
+    /// 获取目录中已有图片数量，从 N+1 开始
+    int GetStartPageFromDir(const std::wstring& dir) {
+        int startPage = 1;
+        std::wstring searchPath = dir + L"\\*.png";
+        WIN32_FIND_DATAW ffd;
+        HANDLE hFind = FindFirstFileW(searchPath.c_str(), &ffd);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            int maxNum = 0;
+            do {
+                std::wstring name = ffd.cFileName;
+                if (name.size() > 4 && name.substr(name.size() - 4) == L".png") {
+                    std::wstring numStr = name.substr(0, name.size() - 4);
+                    try {
+                        int num = std::stoi(numStr);
+                        if (num > maxNum) maxNum = num;
+                    } catch (...) {}
+                }
+            } while (FindNextFileW(hFind, &ffd) != 0);
+            FindClose(hFind);
+            startPage = maxNum + 1;
+            PostLog(L"[INFO] 目录已有 " + std::to_wstring(maxNum) + L" 张截图，从第 " + std::to_wstring(startPage) + L" 张开始");
+        }
+        return startPage;
+    }
+    
     /// 将鼠标移动到指定屏幕坐标
     void SimulateMouseMove(int x, int y) {
         SetCursorPos(x, y);
@@ -259,6 +318,21 @@ public:
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
         Sleep(300);
     }
+    
+    /// 模拟翻页：来回移动鼠标防止空闲，再按空格翻页
+    void SimulatePageTurn(int centerX, int centerY) {
+        for (int i = -20; i <= 20; i += 2) {
+            SetCursorPos(centerX + i, centerY);
+            Sleep(5);
+        }
+        for (int i = 20; i >= -20; i -= 2) {
+            SetCursorPos(centerX + i, centerY);
+            Sleep(5);
+        }
+        SimulateMouseClick();
+        Sleep(100);
+        SimulateKeyPress(VK_SPACE);
+    }
 
     /// 自动操作：循环截图 + 翻页 + 触发识别
     void RunAutoAction() {
@@ -272,148 +346,44 @@ public:
         int centerX = (selectedRectScreen.left + selectedRectScreen.right) / 2;
         int centerY = (selectedRectScreen.top + selectedRectScreen.bottom) / 2;
         
-        // 获取目录中已有图片数量，从 N+1 开始
-        int startPage = 1;
-        std::wstring searchPath = dir + L"\\*.png";
-        WIN32_FIND_DATAW ffd;
-        HANDLE hFind = FindFirstFileW(searchPath.c_str(), &ffd);
-        if (hFind != INVALID_HANDLE_VALUE) {
-            int maxNum = 0;
-            do {
-                std::wstring name = ffd.cFileName;
-                // 去掉 .png 后缀
-                if (name.size() > 4 && name.substr(name.size() - 4) == L".png") {
-                    std::wstring numStr = name.substr(0, name.size() - 4);
-                    try {
-                        int num = std::stoi(numStr);
-                        if (num > maxNum) maxNum = num;
-                    } catch (...) {}
-                }
-            } while (FindNextFileW(hFind, &ffd) != 0);
-            FindClose(hFind);
-            startPage = maxNum + 1;
-            PostLog(L"[INFO] 目录已有 " + std::to_wstring(maxNum) + L" 张截图，从第 " + std::to_wstring(startPage) + L" 张开始");
-        }
+        int startPage = GetStartPageFromDir(dir);
+        int page = startPage;
+        int errorCount = 0;
+        const int maxErrors = 50;
         
-        for (int page = startPage; page <= totalPage; page++) {
+        while (page <= totalPage) {
             // 检查是否被中断
             if (!isAutoActionRunning.load()) {
                 PostLog(L"[INFO] 用户中断自动操作");
                 return;
             }
             
-            // 截图（直接使用页码作为文件名，确保连续）
+            // 截图
             std::wstring pngPath = dir + L"\\" + std::to_wstring(page) + L".png";
-            std::wstring err;
-            if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, pngPath, &err)) {
-                PostLog(L"[ERROR] 截图失败: " + err);
-                FinishAutoAction(false);
-                return;
-            }
-            int pageIndex = page - startPage + 1;
-            PostLog(L"[INFO] 已截图(" + std::to_wstring(pageIndex) + L"/" + std::to_wstring(totalPage) + L"): " + pngPath);
-            
-            // 提取文件名显示到状态栏
-            size_t lastSlash = pngPath.find_last_of(L"\\");
-            std::wstring shortName = (lastSlash != std::wstring::npos) ? pngPath.substr(lastSlash + 1) : pngPath;
-            PostStatusRight(shortName);
-            
-            // CRC32 校验：还原截图并验证
-            {
-                std::string pageFileName;
-                std::string pageContentHex;
-                std::string pageData = DrawGrid::RestoreFromImage(pngPath,
-                    &pageFileName, &pageContentHex, (page == 1));
-                
-                if (pageData.empty()) {
-                    PostLog(L"[ERROR] CRC32 校验失败，截图可能异常，流程终止");
+            if (!CaptureAndVerify(pngPath, dir, page, totalPage)) {
+                errorCount++;
+                PostLog(L"[INFO] CRC校验失败(" + std::to_wstring(errorCount) + L"/" + std::to_wstring(maxErrors) + L"), 等待100ms重试");
+                if (errorCount >= maxErrors) {
+                    PostLog(L"[ERROR] CRC校验连续失败" + std::to_wstring(maxErrors) + L"次，流程终止");
                     FinishAutoAction(false);
                     return;
                 }
+                Sleep(100);
+                continue;
             }
             
-            // 最后一页不翻页
-            if (pageIndex >= totalPage) break;
+            // 校验通过，重置错误计数
+            errorCount = 0;
             
-            // 翻页：来回移动鼠标防止空闲（只移动不单击）
-            for (int i = -20; i <= 20; i += 2) {
-                SetCursorPos(centerX + i, centerY);
-                Sleep(5);
+            if (page >= totalPage) {
+                PostLog(L"[INFO] 所有页面截图完成");
+                break;
             }
-            for (int i = 20; i >= -20; i -= 2) {
-                SetCursorPos(centerX + i, centerY);
-                Sleep(5);
-            }
-            // 单击激活窗口
-            SimulateMouseClick();
+            
+            // 翻页
+            SimulatePageTurn(centerX, centerY);
+            page++;
             Sleep(100);
-            SimulateKeyPress(VK_SPACE);
-            
-            // 等待翻页：动态递增等待时间（1s, 2s, 3s, 4s, 5s），使用 CRC32 校验
-            uint32_t lastPageCrc = 0;
-            if (page > 1) {
-                lastPageCrc = AppUtil::Crc32File(dir + L"\\" + std::to_wstring(page - 1) + L".png");
-            }
-            
-            bool pageChanged = false;
-            int waitMs = 1000;
-            for (int retry = 0; retry < 5; retry++) {
-                if (waitMs > 5000) waitMs = 5000;
-                Sleep(waitMs);
-                std::wstring checkPath = dir + L"\\_wait_" + std::to_wstring(page) + L"_" + std::to_wstring(retry) + L".png";
-                std::wstring chkErr;
-                if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, checkPath, &chkErr)) {
-                    PostLog(L"[ERROR] 翻页验证截图失败: " + chkErr);
-                    FinishAutoAction(false);
-                    return;
-                }
-                
-                uint32_t curCrc = AppUtil::Crc32File(checkPath);
-                
-                if (lastPageCrc == 0 || curCrc != lastPageCrc) {
-                    // CRC32 不同，可能翻页成功，再还原验证
-                    std::string pageFileName;
-                    std::string pageContentHex;
-                    std::string pageData = DrawGrid::RestoreFromImage(checkPath,
-                        &pageFileName, &pageContentHex, (page == 1));
-                    if (!pageData.empty()) {
-                        // 还原成功，翻页成功
-                        DeleteFileW(checkPath.c_str());
-                        pageChanged = true;
-                        break;
-                    }
-                    // 还原失败，删掉临时图，按 F5 刷新后继续等
-                    DeleteFileW(checkPath.c_str());
-                    PostLog(L"[INFO] 翻页后截图还原CRC失败，按F5刷新重试");
-                    SimulateKeyPress(VK_F5);
-                    continue;
-                }
-                
-                // CRC32 相同，再用 SHA256 确认
-                std::string curHash = CalcFileHash(checkPath);
-                DeleteFileW(checkPath.c_str());
-                
-                // 获取上一张图的 hash
-                std::string lastHash;
-                std::wstring prevPath = dir + L"\\" + std::to_wstring(page - 1) + L".png";
-                if (page > 1) {
-                    lastHash = CalcFileHash(prevPath);
-                }
-                
-                if (lastHash.empty() || curHash != lastHash) {
-                    pageChanged = true;
-                    break;
-                }
-                
-                waitMs += 500;
-                PostLog(L"[INFO] 翻页尚未完成，等待" + std::to_wstring(waitMs) + L"ms重试(" + std::to_wstring(retry + 1) + L"/5)");
-            }
-            
-            if (!pageChanged) {
-                PostLog(L"[ERROR] 翻页超时5次仍未成功，流程终止");
-                FinishAutoAction(false);
-                return;
-            }
         }
         
         // 鼠标移回自动操作按钮
