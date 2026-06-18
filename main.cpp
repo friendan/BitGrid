@@ -650,10 +650,12 @@ public:
                 } else {
                     AddLog(L"[ERROR] 写入还原文件失败: " + outPath);
                     UpdateStatus(L"识别失败", L"", L"");
+                    DrawGrid::ClearPageCache();
                 }
             } else {
                 AddLog(L"[ERROR] 识别失败：未还原到有效数据（请确认目录下存在截图）");
                 UpdateStatus(L"识别失败", L"", L"");
+                DrawGrid::ClearPageCache();
             }
             
             // 释放数据
