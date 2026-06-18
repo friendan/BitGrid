@@ -47,3 +47,5 @@ demo
 /bin/Debug/*.lua
 /bin/Debug/file
 
+/bin/BitGrid_dbg.log
+/bin/BitGrid.toml

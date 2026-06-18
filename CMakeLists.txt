@@ -43,10 +43,12 @@ set(PROJECT_HEADERS
     AppUtil.hpp
     DrawGrid.hpp
     AppConst.hpp
+    InjectHelper.hpp
     MnnOcr.hpp
     PathUtil.hpp
     ScreenCapture.hpp
     ScreenSelectOverlay.hpp
+    inject/inject.hpp
     toml.hpp
 )
 
@@ -78,6 +80,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # 确保资源文件依赖关系
 set_property(SOURCE BitGrid.rc PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/main.htm)
+
+############################### inject #################################
+
+add_subdirectory(inject)
 
 ############################### snake #################################
 

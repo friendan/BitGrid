@@ -18,6 +18,8 @@
 #include "MnnOcr.hpp"
 #include "toml.hpp"
 #include "picosha2.h"
+#include "inject/inject.hpp"
+#include "InjectHelper.hpp"
 #include <fstream>
 #include <ctime>
 #include <thread>
@@ -39,6 +41,7 @@ private:
     std::atomic<bool> isRecognizing{false};  // 是否正在识别
     std::atomic<bool> isAutoActionRunning{false};  // 自动操作是否正在运行
     MnnOcr m_ocr;  // OCR 引擎
+    InjectHelper m_injectHelper;  // ToDesk 注入辅助
 
 public:
     MainFrm(int width, int height) : Window(width, height) {
@@ -197,6 +200,9 @@ public:
         // 读取配置文件
         LoadConfig();
         
+        // 自动尝试注入 ToDesk 进程（失败不影响使用，会走降级方案）
+        TryInjectToDesk();
+        
         UpdateStatus(L"就绪", L"", L"");
     }
     
@@ -334,18 +340,57 @@ public:
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
     }
     
-    /// 模拟翻页：来回移动鼠标防止空闲，再按空格翻页
+    /// 模拟翻页：通过注入 ToDesk 进程的 DLL 模拟按键，不占用物理键盘鼠标
     void SimulatePageTurn(int centerX, int centerY) {
-        for (int i = -20; i <= 20; i += 5) {
-            SetCursorPos(centerX + i, centerY);
-            Sleep(1);
+        if (m_injectHelper.IsInjected()) {
+            // 通过注入的 DLL 翻页（在 ToDesk 进程内部模拟按键，推荐）
+            m_injectHelper.SendPageTurn(VK_SPACE);
+        } else {
+            // 降级方案：直接发送消息到目标窗口
+            POINT pt = { centerX, centerY };
+            HWND hTarget = WindowFromPoint(pt);
+            if (!hTarget) return;
+            
+            for (int i = 0; i < 3; i++) {
+                HWND hWnd = (i == 0) ? hTarget :
+                            (i == 1) ? GetAncestor(hTarget, GA_ROOT) :
+                                       GetAncestor(hTarget, GA_ROOTOWNER);
+                if (!hWnd) continue;
+                SendMessage(hWnd, WM_CHAR, VK_SPACE, 0);
+                Sleep(3);
+                SendMessage(hWnd, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(centerX & 0xFFFF, centerY & 0xFFFF));
+                Sleep(3);
+                SendMessage(hWnd, WM_LBUTTONUP, 0, MAKELPARAM(centerX & 0xFFFF, centerY & 0xFFFF));
             }
-            for (int i = 20; i >= -20; i -= 5) {
-                SetCursorPos(centerX + i, centerY);
-                Sleep(1);
         }
-        SimulateMouseClick();
-        SimulateKeyPress(VK_SPACE);
+        Sleep(50);
+    }
+
+    /// 尝试注入 ToDesk_Client.exe
+    void TryInjectToDesk()
+    {
+        // 获取 360safe.dll 的路径（与 exe 同目录）
+        wchar_t exePath[MAX_PATH];
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
+        std::wstring exeDir = exePath;
+        size_t pos = exeDir.find_last_of(L"\\");
+        if (pos != std::wstring::npos) {
+            exeDir = exeDir.substr(0, pos + 1);
+        }
+        
+        std::wstring dllName;
+#ifdef _DEBUG
+        dllName = L"360safe_dbg.dll";
+#else
+        dllName = L"360safe.dll";
+#endif
+        std::wstring dllPath = exeDir + dllName;
+        
+        if (m_injectHelper.Init(dllPath)) {
+            AddLog(L"[INFO] 已注入 ToDesk_Client.exe，翻页将通过注入 DLL 完成（不占用物理键盘鼠标）");
+        } else {
+            AddLog(L"[WARN] 注入 ToDesk 失败: " + m_injectHelper.GetLastError() + L"，将使用降级翻页方案");
+        }
     }
 
     /// 自动操作：循环截图 + 翻页 + 触发识别
