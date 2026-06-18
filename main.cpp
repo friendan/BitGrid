@@ -391,7 +391,7 @@ public:
             
             // 翻页
             SimulatePageTurn(centerX, centerY);
-            Sleep(500);
+            Sleep(300);
             page++;
         }
         

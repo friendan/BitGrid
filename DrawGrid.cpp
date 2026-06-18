@@ -1027,7 +1027,7 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
             progressCallback(static_cast<int>(i + 1), static_cast<int>(files.size()), files[i].path);
         }
         
-        AppUtil::SaveLog("[RestoreFromFolder] Processing file ", std::to_string(i + 1), "/", std::to_string(files.size()), ": ", AppUtil::WStrToStr(files[i].path));
+        //AppUtil::SaveLog("[RestoreFromFolder] Processing file ", std::to_string(i + 1), "/", std::to_string(files.size()), ": ", AppUtil::WStrToStr(files[i].path));
         
         std::string pageFileName;
         std::string pageFileContentHex;
