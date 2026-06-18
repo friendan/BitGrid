@@ -855,8 +855,8 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             // 去掉末尾的 CRC32，只保留数据
             result = dataHex;
         } else {
-            crcInfo += " MISMATCH!";
-            AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
+            //crcInfo += " MISMATCH!";
+            //AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
             delete bitmap;
             return "";
         }

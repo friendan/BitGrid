@@ -355,7 +355,7 @@ public:
         int startPage = GetStartPageFromDir(dir);
         int page = startPage;
         int errorCount = 0;
-        const int maxErrors = 500;
+        const int maxErrors = 50;
         
         while (page <= totalPage) {
             // 检查是否被中断
@@ -377,7 +377,7 @@ public:
                     FinishAutoAction(false);
                     return;
                 }
-                Sleep(10);
+                Sleep(100);
                 continue;
             }
             
@@ -391,6 +391,7 @@ public:
             
             // 翻页
             SimulatePageTurn(centerX, centerY);
+            Sleep(500);
             page++;
         }
         
