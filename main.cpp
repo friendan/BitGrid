@@ -235,14 +235,8 @@ public:
         keybd_event((BYTE)vkKey, scanCode, KEYEVENTF_KEYUP, 0);
     }
     
-    /// 计算文件的 SHA256
-    std::string CalcFileHash(const std::wstring& path) {
-        std::ifstream ifs(AppUtil::WStrToStr(path), std::ios::binary);
-        if (!ifs) return "";
-        return picosha2::hash256_hex_string(
-            std::istreambuf_iterator<char>(ifs),
-            std::istreambuf_iterator<char>());
-    }
+    // 移除：自动操作中不需要 SHA256 和额外的 CRC32 文件校验
+    // RestoreFromImage 内部已有 CRC 校验，无需重复计算
     
     /// 截图并校验，成功返回 true，失败则内部自动终止流程
     bool CaptureAndVerify(const std::wstring& path, const std::wstring& dir, int page, int totalPage) {
@@ -287,10 +281,7 @@ public:
         std::wstring sn = (ls != std::wstring::npos) ? path.substr(ls + 1) : path;
         PostStatusRight(sn);
         
-        uint32_t crc32 = AppUtil::Crc32File(path);
-        std::string sha256 = CalcFileHash(path);
-        AppUtil::SaveLog(AppUtil::WStrToStr(std::to_wstring(page) + L".png: CRC32=0x" + 
-            AppUtil::StrToWStr(AppUtil::UInt32ToHexStr(crc32)) + L" SHA256=" + AppUtil::StrToWStr(sha256)));
+        AppUtil::SaveLog(AppUtil::WStrToStr(std::to_wstring(page) + L".png: verified"));
         
         return true;
     }
@@ -338,11 +329,11 @@ public:
     void SimulatePageTurn(int centerX, int centerY) {
         for (int i = -20; i <= 20; i += 5) {
             SetCursorPos(centerX + i, centerY);
-            Sleep(3);
+            Sleep(1);
         }
         for (int i = 20; i >= -20; i -= 5) {
             SetCursorPos(centerX + i, centerY);
-            Sleep(3);
+            Sleep(1);
         }
         SimulateMouseClick();
         SimulateKeyPress(VK_SPACE);

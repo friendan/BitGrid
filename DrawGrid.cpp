@@ -536,38 +536,52 @@ void DrawGrid::DrawHexString(HWND hwnd, HDC hdc){
 }
 
 //=============================================================================
-// 辅助函数：检查指定列是否为边框列（连续BORDER_LINE_COUNT条边框线）
+// 从 Bitmap 中锁定像素并返回 32-bit ARGB 像素指针
 //=============================================================================
-static bool IsBorderColumn(Gdiplus::Bitmap* bitmap, int x, int height)
+static uint32_t* LockBitmapPixels(Gdiplus::Bitmap* bitmap, int& outWidth, int& outHeight)
 {
-    int borderCount = 0;
-    for (int y = 0; y < height; y++) {
-        Gdiplus::Color color;
-        bitmap->GetPixel(x, y, &color);
-        COLORREF rgbColor = DrawGrid::ColorToRGB(color);
-        if (AppUtil::IsRgbColor(rgbColor, AppConst::BORDER_COLOR)) {
-            borderCount++;
-        }
-    }
-    bool result = borderCount > height * 0.5;  // 该列大部分是边框色
-    return result;
+    outWidth = bitmap->GetWidth();
+    outHeight = bitmap->GetHeight();
+    
+    Gdiplus::Rect rect(0, 0, outWidth, outHeight);
+    Gdiplus::BitmapData bmd;
+    if (bitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bmd) != Gdiplus::Ok)
+        return nullptr;
+    
+    return (uint32_t*)bmd.Scan0;
 }
 
 //=============================================================================
-// 辅助函数：检查指定行是否为边框行（连续BORDER_LINE_COUNT条边框线）
+// 辅助函数：检查指定列是否为边框列（使用 LockBits 像素数据）
 //=============================================================================
-static bool IsBorderRow(Gdiplus::Bitmap* bitmap, int y, int width)
+static bool IsBorderColumnFast(const uint32_t* pixels, int stride, int x, int height)
 {
     int borderCount = 0;
-    for (int x = 0; x < width; x++) {
-        Gdiplus::Color color;
-        bitmap->GetPixel(x, y, &color);
-        COLORREF rgbColor = DrawGrid::ColorToRGB(color);
+    for (int y = 0; y < height; y++) {
+        uint32_t argb = pixels[y * (stride / 4) + x];
+        COLORREF rgbColor = RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
         if (AppUtil::IsRgbColor(rgbColor, AppConst::BORDER_COLOR)) {
             borderCount++;
         }
     }
-    return borderCount > width * 0.5;  // 该行大部分是边框色
+    return borderCount > height * 0.5;
+}
+
+//=============================================================================
+// 辅助函数：检查指定行是否为边框行（使用 LockBits 像素数据）
+//=============================================================================
+static bool IsBorderRowFast(const uint32_t* pixels, int stride, int y, int width)
+{
+    int borderCount = 0;
+    int rowStart = y * (stride / 4);
+    for (int x = 0; x < width; x++) {
+        uint32_t argb = pixels[rowStart + x];
+        COLORREF rgbColor = RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
+        if (AppUtil::IsRgbColor(rgbColor, AppConst::BORDER_COLOR)) {
+            borderCount++;
+        }
+    }
+    return borderCount > width * 0.5;
 }
 
 //=============================================================================
@@ -575,31 +589,22 @@ static bool IsBorderRow(Gdiplus::Bitmap* bitmap, int y, int width)
 // 返回：true=找到边框, false=未找到
 // 要求：找到连续的BORDER_LINE_COUNT条边框线
 //=============================================================================
-static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right, int& bottom)
+static bool FindBorderFast(const uint32_t* pixels, int stride, int width, int height, int& left, int& top, int& right, int& bottom)
 {
-    int width = bitmap->GetWidth();
-    int height = bitmap->GetHeight();
     const int lineCount = AppConst::BORDER_LINE_COUNT;
-    
-    //AppUtil::SaveLog("[FindBorder] Start, image size: ", std::to_string(width), " x ", std::to_string(height));
-    //AppUtil::SaveLog("[FindBorder] BORDER_LINE_COUNT: ", std::to_string(lineCount));
-    //AppUtil::SaveLog("[FindBorder] BORDER_COLOR: ", std::to_string(AppConst::BORDER_COLOR));
-    //AppUtil::SaveLog("[FindBorder] COLOR_THRESHOLD: ", std::to_string(AppConst::COLOR_THRESHOLD));
     
     // 从左边缘查找连续的BORDER_LINE_COUNT条垂直边框线
     left = -1;
-    //AppUtil::SaveLog("[FindBorder] Searching left border...");
     for (int x = 0; x <= width - lineCount && left < 0; x++) {
         bool found = true;
         for (int i = 0; i < lineCount; i++) {
-            if (!IsBorderColumn(bitmap, x + i, height)) {
+            if (!IsBorderColumnFast(pixels, stride, x + i, height)) {
                 found = false;
                 break;
             }
         }
         if (found) {
             left = x;
-            //AppUtil::SaveLog("[FindBorder] Left border found at x=", std::to_string(x));
             break;
         }
     }
@@ -612,7 +617,7 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     for (int x = width - 1; x >= lineCount - 1; x--) {
         bool found = true;
         for (int i = 0; i < lineCount; i++) {
-            if (!IsBorderColumn(bitmap, x - i, height)) {
+            if (!IsBorderColumnFast(pixels, stride, x - i, height)) {
                 found = false;
                 break;
             }
@@ -628,7 +633,7 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     for (int y = 0; y <= height - lineCount; y++) {
         bool found = true;
         for (int i = 0; i < lineCount; i++) {
-            if (!IsBorderRow(bitmap, y + i, width)) {
+            if (!IsBorderRowFast(pixels, stride, y + i, width)) {
                 found = false;
                 break;
             }
@@ -644,7 +649,7 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
     for (int y = height - 1; y >= lineCount - 1; y--) {
         bool found = true;
         for (int i = 0; i < lineCount; i++) {
-            if (!IsBorderRow(bitmap, y - i, width)) {
+            if (!IsBorderRowFast(pixels, stride, y - i, width)) {
                 found = false;
                 break;
             }
@@ -655,41 +660,30 @@ static bool FindBorder(Gdiplus::Bitmap* bitmap, int& left, int& top, int& right,
         }
     }
     
-    // 验证是否找到所有边框
-    // AppUtil::SaveLog("[FindBorder] left=", std::to_string(left)
-    //     , " right=", std::to_string(right)
-    //     , " top=", std::to_string(top)
-    //     , " bottom=", std::to_string(bottom)
-    // );
-    
     if (left < 0 || right < 0 || top < 0 || bottom < 0) {
         AppUtil::SaveLog("[FindBorder] Failed: some border not found");
         return false;
     }
     
-    // 验证能组成有效矩形：left < right 且 top < bottom
     if (left >= right || top >= bottom) {
         AppUtil::SaveLog("[FindBorder] Failed: invalid rectangle");
         return false;
     }
     
-    // 验证边框宽度一致（左右边框间距等于绘制区域宽度 + 2*lineOffset + 2*lineCount）
     int borderWidth = right - left + 1;
-    int expectedMinWidth = lineCount * 2 + 2;  // 至少要有左右边框+偏移
+    int expectedMinWidth = lineCount * 2 + 2;
     if (borderWidth < expectedMinWidth) {
         AppUtil::SaveLog("[FindBorder] Failed: borderWidth too small: ", std::to_string(borderWidth));
         return false;
     }
     
-    // 验证边框高度一致
     int borderHeight = bottom - top + 1;
-    int expectedMinHeight = lineCount * 2 + 2;  // 至少要有上下边框+偏移
+    int expectedMinHeight = lineCount * 2 + 2;
     if (borderHeight < expectedMinHeight) {
         AppUtil::SaveLog("[FindBorder] Failed: borderHeight too small: ", std::to_string(borderHeight));
         return false;
     }
     
-    //AppUtil::SaveLog("[FindBorder] Success");
     return true;
 }
 
@@ -761,159 +755,86 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     
     int width = bitmap->GetWidth();
     int height = bitmap->GetHeight();
-    //AppUtil::SaveLog("[RestoreFromImage] Image size: ", std::to_string(width), " x ", std::to_string(height));
     
-    // 查找边框位置
-    int left, top, right, bottom;
-    //AppUtil::SaveLog("[RestoreFromImage] Finding border...");
-    if (!FindBorder(bitmap, left, top, right, bottom)) {
-        AppUtil::SaveLog("[RestoreFromImage] FindBorder failed");
+    // LockBits 一次性锁定全部像素
+    Gdiplus::Rect lockRect(0, 0, width, height);
+    Gdiplus::BitmapData bmd;
+    if (bitmap->LockBits(&lockRect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bmd) != Gdiplus::Ok) {
+        AppUtil::SaveLog("[RestoreFromImage] LockBits failed");
         delete bitmap;
         return result;
     }
     
-    //AppUtil::SaveLog("[RestoreFromImage] Border found: left=", std::to_string(left), 
-    //                 " top=", std::to_string(top), 
-    //                 " right=", std::to_string(right), 
-    //                 " bottom=", std::to_string(bottom));
+    const uint32_t* pixels = (const uint32_t*)bmd.Scan0;
+    int stride = bmd.Stride;
+    int stridePixels = stride / 4;
+    
+    // 查找边框位置
+    int left, top, right, bottom;
+    if (!FindBorderFast(pixels, stride, width, height, left, top, right, bottom)) {
+        AppUtil::SaveLog("[RestoreFromImage] FindBorder failed");
+        bitmap->UnlockBits(&bmd);
+        delete bitmap;
+        return result;
+    }
     
     const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
     const static int& lineCount = AppConst::BORDER_LINE_COUNT;
     
-   // AppUtil::SaveLog("[RestoreFromImage] lineOffset=", std::to_string(lineOffset), " lineCount=", std::to_string(lineCount));
-    
     // 计算真实绘制区域（去掉边框）
-    // 边框有lineCount条线，数据从边框内侧开始
     int xStart = left + lineCount;
     int yStart = top + lineCount;
     int xEnd = right - lineCount + 1;
     int yEnd = bottom - lineCount + 1;
     
-    //AppUtil::SaveLog("[RestoreFromImage] Draw area: xStart=", std::to_string(xStart), 
-    //                 " yStart=", std::to_string(yStart), 
-    //                 " xEnd=", std::to_string(xEnd), 
-    //                 " yEnd=", std::to_string(yEnd));
-    
     int drawWidth = xEnd - xStart;
     int drawHeight = yEnd - yStart;
     
-    //AppUtil::SaveLog("[RestoreFromImage] Draw size: ", std::to_string(drawWidth), " x ", std::to_string(drawHeight));
-    
     if (drawWidth <= 0 || drawHeight <= 0) {
         AppUtil::SaveLog("[RestoreFromImage] Invalid draw size");
+        bitmap->UnlockBits(&bmd);
         delete bitmap;
         return result;
     }
     
-    // 读取像素并还原为十六进制字符串
+    // 预分配结果字符串
+    result.reserve(drawWidth * drawHeight / 4 + 8);
+    
+    // 读取像素并还原为十六进制字符串（使用 LockBits 内存直接访问）
     uint8_t bits[4] = {0};
     int bitIndex = 0;
-    int totalPixels = 0;
-    //AppUtil::SaveLog("[RestoreFromImage] Starting pixel processing...");
-    
-    int maxPixelsPerRow = 0;
-    int minPixelsPerRow = xEnd - xStart;  // 初始化为最大值
-    int totalRows = 0;
-    int rowsWithPixels = 0;
 
     for (int y = yStart; y < yEnd; y++) {
-        int rowPixels = 0;  // 记录当前行读取的像素数
-        bool rowHasData = false;
-        
-        // 是否记录详细日志（最后10行且该行像素数接近预期宽度）
-        bool logDetail = (y >= yEnd - 10);
+        const uint32_t* row = pixels + y * stridePixels;
         
         for (int x = xStart; x < xEnd; x++) {
-            Gdiplus::Color color;
-            bitmap->GetPixel(x, y, &color);
-
-            COLORREF rgbColor = ColorToRGB(color);
+            uint32_t argb = row[x];
+            COLORREF rgbColor = RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
             uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
 
-            // 遇到无效颜色（背景色），停止当前行，跳到下一行
+            // 遇到无效颜色（背景色），停止当前行
             if (bit == 255) {
-                // 记录首尾几行的详细信息
-                // if (y < yStart + 10 || y > yEnd - 10) {
-                //     int r = GetRValue(rgbColor);
-                //     int g = GetGValue(rgbColor);
-                //     int b = GetBValue(rgbColor);
-                //     int distBlack = r + g + b;
-                //     int distWhite = (255-r) + (255-g) + (255-b);
-                //     AppUtil::SaveLog("[RestoreFromImage] Row ", std::to_string(y), ": stopped at x=", std::to_string(x), 
-                //                    ", pixels=", std::to_string(rowPixels),
-                //                    ", color=RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
-                //                    ", distBlack=", std::to_string(distBlack),
-                //                    ", distWhite=", std::to_string(distWhite));
-                // }
-                
-                // 如果这一行多识别了像素，记录前一个像素的信息
-                if (logDetail && rowPixels >= (xEnd - xStart) - 3 && rowPixels < (xEnd - xStart)) {
-                    // 记录最后一个有效像素
-                    if (rowPixels > 0) {
-                        Gdiplus::Color lastColor;
-                        bitmap->GetPixel(x - 1, y, &lastColor);
-                        COLORREF lastRgb = ColorToRGB(lastColor);
-                        int lr = GetRValue(lastRgb);
-                        int lg = GetGValue(lastRgb);
-                        int lb = GetBValue(lastRgb);
-                        uint8_t lastBit = AppUtil::GetRgbColorBit(lastRgb);
-                        //AppUtil::SaveLog("[RestoreFromImage]   -> Last valid pixel at x=", std::to_string(x-1),
-                        //               ", RGB(", std::to_string(lr), ",", std::to_string(lg), ",", std::to_string(lb), ")",
-                        //               ", bit=", std::to_string(lastBit));
-                    }
-                }
-                break;  // 停止当前行
+                break;
             }
             
-            // 记录最后几行的每个像素（特别是接近边界的像素）
-            // if (logDetail && rowPixels >= (xEnd - xStart) - 5) {
-            //     int r = GetRValue(rgbColor);
-            //     int g = GetGValue(rgbColor);
-            //     int b = GetBValue(rgbColor);
-            //     int distBlack = r + g + b;
-            //     AppUtil::SaveLog("[RestoreFromImage] DEBUG Row ", std::to_string(y), " x=", std::to_string(x),
-            //                    " pixel#", std::to_string(rowPixels),
-            //                    " RGB(", std::to_string(r), ",", std::to_string(g), ",", std::to_string(b), ")",
-            //                    " distBlack=", std::to_string(distBlack),
-            //                    " bit=", std::to_string(bit));
-            // }
-            
-            rowPixels++;
-            rowHasData = true;
-            totalPixels++;
             bits[bitIndex++] = bit;
             if (bitIndex >= 4) {
                 result += AppUtil::BitsToHexChar(bits);
                 bitIndex = 0;
             }
         }
-        
-        // 统计每行的像素数
-        totalRows++;
-        if (rowPixels > 0) {
-            rowsWithPixels++;
-            if (rowPixels > maxPixelsPerRow) maxPixelsPerRow = rowPixels;
-            if (rowPixels < minPixelsPerRow) minPixelsPerRow = rowPixels;
-        }
     }
-    
-    //AppUtil::SaveLog("[RestoreFromImage] Pixel processing done");
-    //AppUtil::SaveLog("[RestoreFromImage] bitIndex: ", std::to_string(bitIndex));
-    //AppUtil::SaveLog("[RestoreFromImage] Statistics: totalRows=", std::to_string(totalRows),
-    //                 ", rowsWithPixels=", std::to_string(rowsWithPixels),
-    //                 ", maxPixelsPerRow=", std::to_string(maxPixelsPerRow),
-    //                 ", minPixelsPerRow=", std::to_string(minPixelsPerRow),
-    //                 ", expectedWidth=", std::to_string(xEnd - xStart));
     
     // 处理剩余的bits（不足4个时用0填充）
     if (bitIndex > 0) {
-        // 用0填充到4个bit
         AppUtil::SaveLog("[RestoreFromImage] Pixel padding");
         while (bitIndex < 4) {
             bits[bitIndex++] = 0;
         }
         result += AppUtil::BitsToHexChar(bits);
     }
+    
+    bitmap->UnlockBits(&bmd);
     
     //AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
     
