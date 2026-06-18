@@ -739,7 +739,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     }
     
     //AppUtil::SaveLog("[RestoreFromImage] Start");
-    AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
+    //AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
     //AppUtil::SaveLog("[RestoreFromImage] isFirstPage: ", isFirstPage ? "true" : "false");
     
     // 加载图片
@@ -868,7 +868,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     size_t resultBytes = resultLen / 2;
     char hexBuf1[16];
     snprintf(hexBuf1, sizeof(hexBuf1), "0x%zX", resultLen);
-    AppUtil::SaveLog("[RestoreFromImage] Result hex length: ", std::to_string(resultLen), " bytes (", std::string(hexBuf1), ") [", std::to_string(resultBytes), " data bytes]");
+    //AppUtil::SaveLog("[RestoreFromImage] Result hex length: ", std::to_string(resultLen), " bytes (", std::string(hexBuf1), ") [", std::to_string(resultBytes), " data bytes]");
         
     delete bitmap;
     //AppUtil::SaveLog("[RestoreFromImage] End");
@@ -933,7 +933,7 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         size_t contentBytes = contentLen / 2;
         char hexBuf2[16];
         snprintf(hexBuf2, sizeof(hexBuf2), "0x%zX", contentLen);
-        AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(contentLen), " bytes (", std::string(hexBuf2), ") [", std::to_string(contentBytes), " data bytes]");
+        //AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(contentLen), " bytes (", std::string(hexBuf2), ") [", std::to_string(contentBytes), " data bytes]");
     }
     
     if (outFileContentHex) {

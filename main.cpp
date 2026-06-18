@@ -281,7 +281,7 @@ public:
         std::wstring sn = (ls != std::wstring::npos) ? path.substr(ls + 1) : path;
         PostStatusRight(sn);
         
-        AppUtil::SaveLog(AppUtil::WStrToStr(std::to_wstring(page) + L".png: verified"));
+        //AppUtil::SaveLog(AppUtil::WStrToStr(std::to_wstring(page) + L".png: verified"));
         
         return true;
     }
@@ -355,7 +355,7 @@ public:
         int startPage = GetStartPageFromDir(dir);
         int page = startPage;
         int errorCount = 0;
-        const int maxErrors = 50;
+        const int maxErrors = 500;
         
         while (page <= totalPage) {
             // 检查是否被中断
@@ -368,13 +368,16 @@ public:
             std::wstring pngPath = dir + L"\\" + std::to_wstring(page) + L".png";
             if (!CaptureAndVerify(pngPath, dir, page, totalPage)) {
                 errorCount++;
-                //PostLog(L"[INFO] CRC校验失败(" + std::to_wstring(errorCount) + L"/" + std::to_wstring(maxErrors) + L"), 等待100ms重试");
                 if (errorCount >= maxErrors) {
                     PostLog(L"[ERROR] CRC校验连续失败" + std::to_wstring(maxErrors) + L"次，流程终止");
+                    // 删除最后一张异常图片
+                    if (DeleteFileW(pngPath.c_str())) {
+                        PostLog(L"[INFO] 已删除异常图片: " + pngPath);
+                    }
                     FinishAutoAction(false);
                     return;
                 }
-                Sleep(30);
+                Sleep(10);
                 continue;
             }
             
