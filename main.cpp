@@ -334,12 +334,18 @@ public:
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
     }
     
-    /// 模拟翻页：使用 keybd_event 模拟空格键
+    /// 模拟翻页：来回移动鼠标防止空闲，再按空格翻页
     void SimulatePageTurn(int centerX, int centerY) {
-        BYTE scanCode = (BYTE)MapVirtualKeyA(VK_SPACE, MAPVK_VK_TO_VSC);
-        keybd_event(VK_SPACE, scanCode, 0, 0);
-        Sleep(10);
-        keybd_event(VK_SPACE, scanCode, KEYEVENTF_KEYUP, 0);
+        for (int i = -20; i <= 20; i += 5) {
+            SetCursorPos(centerX + i, centerY);
+            Sleep(3);
+        }
+        for (int i = 20; i >= -20; i -= 5) {
+            SetCursorPos(centerX + i, centerY);
+            Sleep(3);
+        }
+        SimulateMouseClick();
+        SimulateKeyPress(VK_SPACE);
     }
 
     /// 自动操作：循环截图 + 翻页 + 触发识别
