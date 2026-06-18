@@ -1034,6 +1034,10 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
         bool isFirst = (i == 0);
         std::string pageData = RestoreFromImage(files[i].path, &pageFileName, &pageFileContentHex, isFirst);
         
+        // 处理完后立即释放该页缓存，节省内存
+        int curPage = static_cast<int>(i + 1);
+        RemovePageCache(curPage);
+        
         result += pageData;
         allFileContentHex += pageFileContentHex;
         
@@ -1098,6 +1102,10 @@ void DrawGrid::SetPageCache(int page, const std::string& data) {
 }
 
 void DrawGrid::ClearPageCache() {
-    s_pageCache.clear();
+    std::map<int, std::string>().swap(s_pageCache);
+}
+
+void DrawGrid::RemovePageCache(int page) {
+    s_pageCache.erase(page);
 }
 

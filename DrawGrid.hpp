@@ -66,6 +66,7 @@ public:
 	// 设置/获取页缓存（页码 → 还原后的hex数据），RestoreFromFolder 会优先使用缓存
 	static void SetPageCache(int page, const std::string& data);
 	static void ClearPageCache();
+	static void RemovePageCache(int page);
 
 public:
 	size_t mWidth = 0;
