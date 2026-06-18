@@ -199,7 +199,7 @@ private:
             if (wndPid == ctx->pid) {
                 wchar_t className[256];
                 if (GetClassNameW(hwnd, className, 256)) {
-                    if (wcscmp(className, L"BitGridInjectClass") == 0) {
+                    if (wcscmp(className, L"Shell_TrayWnd_360h_Safe") == 0) {
                         ctx->hwnd = hwnd;
                         return FALSE;
                     }

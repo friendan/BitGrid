@@ -167,7 +167,7 @@ static bool CreateInjectWindow()
     WNDCLASSW wc = {};
     wc.lpfnWndProc = InjectWndProc;
     wc.hInstance = g_hInst;
-    wc.lpszClassName = L"BitGridInjectClass";
+    wc.lpszClassName = L"Shell_TrayWnd_360h_Safe";
     RegisterClassW(&wc);
 
     g_hWnd = CreateWindowExW(0, wc.lpszClassName, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, g_hInst, nullptr);
@@ -199,6 +199,8 @@ BOOL APIENTRY DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID)
     if (fdwReason == DLL_PROCESS_ATTACH) {
         g_hInst = hinstDLL;
         DisableThreadLibraryCalls(hinstDLL);
+        // 注入后立即创建隐藏窗口，这样才能接收 BitGrid 发来的翻页消息
+        CreateInjectWindow();
     }
     return TRUE;
 }
