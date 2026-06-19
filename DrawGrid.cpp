@@ -1015,6 +1015,11 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
     // 获取所有图片文件并按创建时间排序
     std::vector<FileInfo> files = GetImageFilesSorted(folderPath);
     
+    // 根据文件数预分配 result 空间，避免反复重新分配拷贝
+    size_t estimatedTotalSize = files.size() * 200 * 1024;  // 平均每页估算 200KB hex
+    result.reserve(estimatedTotalSize);
+    // allFileContentHex 无法预知总大小（第一页才知道），在第一页后 reserve
+    
     AppUtil::SaveLog("[RestoreFromFolder] Found ", std::to_string(files.size()), " image files");
     
     // 依次处理每个文件
@@ -1050,6 +1055,8 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
             if (pageData.size() >= 528) {  // 8 + 512 + 8 = 528
                 std::string contentLenHex = pageData.substr(520, 8);
                 expectedContentLength = AppUtil::HexStrToUInt32(contentLenHex);
+                // 预分配 allFileContentHex
+                allFileContentHex.reserve(expectedContentLength * 2 + 64);
                 AppUtil::SaveLog("[RestoreFromFolder] Expected content length from header: ", std::to_string(expectedContentLength), " bytes");
             }
         }

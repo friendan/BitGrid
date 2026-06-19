@@ -22,6 +22,8 @@
 #include <ctime>
 #include <thread>
 #include <atomic>
+#include <mutex>
+#include <queue>
 
 using namespace ezui;
 
@@ -39,6 +41,10 @@ private:
     std::atomic<bool> isRecognizing{false};  // 是否正在识别
     std::atomic<bool> isAutoActionRunning{false};  // 自动操作是否正在运行
     MnnOcr m_ocr;  // OCR 引擎
+    
+    // 日志队列：后台线程写，UI 线程定时拉取刷新
+    std::mutex m_logMutex;
+    std::queue<std::wstring> m_logQueue;
 
 public:
     MainFrm(int width, int height) : Window(width, height) {
@@ -196,6 +202,9 @@ public:
         
         // 读取配置文件
         LoadConfig();
+        
+        // 创建定时器：每 500ms 刷新一次日志队列到 UI
+        SetTimer(this->Hwnd(), 1001, 500, nullptr);
         
         UpdateStatus(L"就绪", L"", L"");
     }
@@ -429,31 +438,53 @@ public:
     // ---------- 日志 ----------
     
     void AddLog(const std::wstring& message) {
-        // 只打印到窗口，不写日志文件
-        // AppUtil::SaveLog("[BitGrid UI] ", AppUtil::WStrToStr(message));
+        // 获取当前时间
+        time_t now = time(0);
+        tm ltm;
+        localtime_s(&ltm, &now);
+        wchar_t timeStr[32];
+        swprintf_s(timeStr, L"%04d-%02d-%02d %02d:%02d:%02d", 
+            ltm.tm_year + 1900, ltm.tm_mon + 1, ltm.tm_mday,
+            ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
         
-        if (logBox) {
-            // 获取当前时间
-            time_t now = time(0);
-            tm ltm;
-            localtime_s(&ltm, &now);
-            wchar_t timeStr[32];
-            swprintf_s(timeStr, L"%04d-%02d-%02d %02d:%02d:%02d", 
-                ltm.tm_year + 1900, ltm.tm_mon + 1, ltm.tm_mday,
-                ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
-            
-            // 组合时间戳和消息
-            std::wstring fullMessage = std::wstring(timeStr) + L" " + message + L"\r\n";
-            
-            // 获取当前文本并追加新日志
-            std::wstring currentText = AppUtil::StrToWStr(logBox->GetText().c_str());
-            logBox->SetText((currentText + fullMessage).c_str());
-            
-            // 自动滚动到底部
-            auto* sb = logBox->GetScrollBar();
-            if (sb) {
-                sb->ScrollTo(1.0f);
+        // 组合时间戳和消息
+        std::wstring fullMessage = std::wstring(timeStr) + L" " + message + L"\r\n";
+        
+        // 入队（线程安全），UI 定时器会定时刷新
+        {
+            std::lock_guard<std::mutex> lock(m_logMutex);
+            m_logQueue.push(std::move(fullMessage));
+        }
+        
+        // 通知 UI 线程刷新
+        PostMessage(this->Hwnd(), WM_USER + 103, 0, 0);
+    }
+    
+    /// 将日志队列刷新到 UI（由定时器或消息触发，在 UI 线程执行）
+    void FlushLog() {
+        if (!logBox) return;
+        
+        // 从队列取出所有待显示日志
+        std::wstring batch;
+        {
+            std::lock_guard<std::mutex> lock(m_logMutex);
+            batch.reserve(m_logQueue.size() * 256);
+            while (!m_logQueue.empty()) {
+                batch += m_logQueue.front();
+                m_logQueue.pop();
             }
+        }
+        
+        if (batch.empty()) return;
+        
+        // 一次性追加到日志框
+        std::wstring currentText = AppUtil::StrToWStr(logBox->GetText().c_str());
+        logBox->SetText((currentText + batch).c_str());
+        
+        // 自动滚动到底部
+        auto* sb = logBox->GetScrollBar();
+        if (sb) {
+            sb->ScrollTo(1.0f);
         }
     }
     
@@ -742,6 +773,16 @@ public:
             } else {
                 UpdateStatus(L"自动终止", L"", L"");
             }
+            return 0;
+        }
+        else if (msg == WM_USER + 103) {
+            // 日志刷新消息（来自 AddLog 的 PostMessage）
+            FlushLog();
+            return 0;
+        }
+        else if (msg == WM_TIMER && wParam == 1001) {
+            // 定时器触发日志刷新
+            FlushLog();
             return 0;
         }
         else if (msg == WM_HOTKEY) {
