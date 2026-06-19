@@ -723,15 +723,6 @@ public:
                 
                 std::wstring wFileName = AppUtil::StrToWStr(fileName);
                 wFileName = PathUtil::SanitizeFileName(wFileName, L"restored.bin");
-                // 截断文件名防止超过 MAX_PATH（260字符），保留扩展名
-                if (wFileName.size() > 100) {
-                    size_t dotPos = wFileName.find_last_of(L'.');
-                    if (dotPos != std::wstring::npos && dotPos < 100) {
-                        wFileName = wFileName.substr(0, 96) + wFileName.substr(dotPos);
-                    } else {
-                        wFileName = wFileName.substr(0, 100);
-                    }
-                }
 
                 // 在 exe 目录下创建 file 子目录
                 std::wstring fileDir = PathUtil::GetExeDir() + L"\\file";
