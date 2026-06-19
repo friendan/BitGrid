@@ -129,6 +129,16 @@ std::string AppUtil::UInt32ToHexStr(uint32_t value){
     return hexStr;
 }
 
+std::string AppUtil::UInt16ToHexStr(uint16_t value){
+    static const char hexTable[] = "0123456789ABCDEF";
+    std::string hexStr(4, '0');
+    for (int i = 3; i >= 0; i--) {
+        hexStr[i] = hexTable[value & 0x0F];
+        value >>= 4;
+    }
+    return hexStr;
+}
+
 uint32_t AppUtil::HexStrToUInt32(const std::string& hexStr){
     if (hexStr.size() != 8) {
         return 0;

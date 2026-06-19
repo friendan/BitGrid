@@ -56,6 +56,7 @@ public:
 	 * @return 8字符的十六进制字符串（如："00000100"）
 	 */
 	static std::string UInt32ToHexStr(uint32_t value);
+	static std::string UInt16ToHexStr(uint16_t value);
 	
 	/**
 	 * @brief 将8字符的十六进制字符串转换为uint32（大端序）
