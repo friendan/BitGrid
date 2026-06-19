@@ -481,8 +481,8 @@ public:
         std::wstring currentText = AppUtil::StrToWStr(logBox->GetText().c_str());
         currentText += batch;
         
-        // 限制最多 1024 行：计算行数，保留最后 1024 行
-        const int maxLines = 1024;
+        // 限制最多 512 行：计算行数，保留最后 512 行
+        const int maxLines = 512;
         int lineCount = 0;
         for (size_t i = 0; i < currentText.size(); i++) {
             if (currentText[i] == L'\n') lineCount++;
