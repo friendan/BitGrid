@@ -61,6 +61,8 @@ void DrawGrid::DrawInit(HWND hwnd, HDC hdc){
         if(mTotalPage < 1){
             mTotalPage = 1;
         }
+        // 把计算出的总页数写入协议头（第一页文件中），供截图还原时读取
+        UpdateTotalPageInHeader((uint16_t)mTotalPage);
     } else {
         // 没有数据时重置分页状态
         mPageSize = 0;
@@ -94,6 +96,7 @@ void DrawGrid::DrawInitForDIB(int width, int height){
         if(mTotalPage < 1){
             mTotalPage = 1;
         }
+        UpdateTotalPageInHeader((uint16_t)mTotalPage);
     } else {
         // 没有数据时重置分页状态
         mPageSize = 0;
@@ -102,6 +105,7 @@ void DrawGrid::DrawInitForDIB(int width, int height){
     }
 }
 
+// 更新帧动画
 void DrawGrid::DrawBorder(HWND hwnd, HDC hdc)
 {
     if (!hwnd || !hdc) return;
@@ -358,9 +362,25 @@ void DrawGrid::SetHexString(const std::string& hexString){
     mCurPage = 1;
 }
 
+void DrawGrid::SetHexStringWithTotalPage(const std::string& hexString, uint16_t totalPage){
+    if (totalPage == 0) totalPage = 1;
+    mHexString = hexString;
+    mCurPage = 1;
+    
+    UpdateTotalPageInHeader(totalPage);
+}
+
+void DrawGrid::UpdateTotalPageInHeader(uint16_t totalPage){
+    // 在文件头第8~12位（4 hex字符）写入总页数
+    // 格式：文件名长度(8) + 总页数(4) + 文件名(512) + ...
+    if (mHexString.size() >= 12) {
+        mHexString.replace(8, 4, AppUtil::UInt16ToHexStr(totalPage));
+    }
+}
+
 // 设置带文件名和文件长度的十六进制字符串
 // 格式：文件名长度(4字节) + 文件名(256字节) + 文件内容长度(4字节) + 文件内容
-void DrawGrid::SetFileData(const std::string& fileName, const std::string& fileContentHex){
+void DrawGrid::SetFileData(const std::string& fileName, const std::string& fileContentHex, uint16_t totalPage){
     // 确保文件名不超过256字节
     std::string paddedName = fileName;
     if (paddedName.size() > 256) {
@@ -378,14 +398,17 @@ void DrawGrid::SetFileData(const std::string& fileName, const std::string& fileC
     uint32_t contentLength = fileContentHex.size() / 2;
     
     // 构建完整的十六进制字符串
-    // 格式：文件名长度(8个hex字符) + 文件名(512个hex字符) + 文件内容长度(8个hex字符) + 文件内容
+    // 格式：文件名长度(8hex) + 总页数(4hex) + 文件名(512hex) + 文件内容长度(8hex) + 文件内容
     std::string nameLenHex = AppUtil::UInt32ToHexStr(256);  // 固定256字节
+    if (totalPage == 0) totalPage = 1;  // 总页数至少为1
+    std::string totalPageHex = AppUtil::UInt16ToHexStr(totalPage);
     std::string contentLenHex = AppUtil::UInt32ToHexStr(contentLength);
     
-    mHexString = nameLenHex + fileNameHex + contentLenHex + fileContentHex;
+    mHexString = nameLenHex + totalPageHex + fileNameHex + contentLenHex + fileContentHex;
     mCurPage = 1;
     
     AppUtil::SaveLog("[SetFileData] fileName=", fileName, 
+                     " totalPage=", std::to_string(totalPage),
                      " contentLength=", std::to_string(contentLength),
                      " totalHexSize=", std::to_string(mHexString.size()));
 }
@@ -697,7 +720,8 @@ COLORREF DrawGrid::ColorToRGB(const Gdiplus::Color& color){
 std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath, 
                                         std::string* outFileName,
                                         std::string* outFileContentHex,
-                                        bool isFirstPage)
+                                        bool isFirstPage,
+                                        uint16_t* outTotalPage)
 {
     std::string result;
     
@@ -715,16 +739,21 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
             auto it = s_pageCache.find(page);
             if (it != s_pageCache.end()) {
                 result = it->second;
-                // 第一页需要解析文件名和内容
-                if (isFirstPage && result.size() >= 528) {
-                    if (outFileName && result.size() >= 528) {
-                        std::string nameHex = result.substr(8, 512);
+                // 第一页需要解析文件名、总页数和内容
+                if (isFirstPage && result.size() >= 532) {  // 8+4+512+8=532
+                    // 解析总页数
+                    if (outTotalPage) {
+                        std::string totalPageHex = result.substr(8, 4);
+                        *outTotalPage = (uint16_t)AppUtil::HexStrToUInt32(std::string("0000") + totalPageHex);
+                    }
+                    if (outFileName) {
+                        std::string nameHex = result.substr(12, 512);  // 8+4=12
                         std::string name = AppUtil::HexStrToStr(nameHex);
                         while (!name.empty() && name.back() == '0') name.pop_back();
                         if (!name.empty()) *outFileName = name;
                     }
-                    std::string contentHex = result.substr(528);
-                    std::string clHex = result.substr(520, 8);
+                    std::string contentHex = result.substr(532);
+                    std::string clHex = result.substr(524, 8);  // 8+4+512=524
                     uint32_t contentLen = AppUtil::HexStrToUInt32(clHex);
                     if (contentHex.length() > (size_t)contentLen * 2) {
                         contentHex = contentHex.substr(0, (size_t)contentLen * 2);
@@ -873,33 +902,40 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
     delete bitmap;
     //AppUtil::SaveLog("[RestoreFromImage] End");
 
-    // 解析新格式：文件名长度(8hex) + 文件名(512hex) + 文件内容长度(8hex) + 文件内容
+    // 解析新格式：文件名长度(8hex) + 总页数(4hex) + 文件名(512hex) + 文件内容长度(8hex) + 文件内容
+    // 文件头固定 8+4+512+8 = 532 hex字符
     std::string fileContentHex = result;
-    if (isFirstPage && result.size() >= 528) {  // 8 + 512 + 8 = 528
+    if (isFirstPage && result.size() >= 532) {
         // 解析文件名长度（应该固定为256）
         std::string nameLenHex = result.substr(0, 8);
         uint32_t nameLen = AppUtil::HexStrToUInt32(nameLenHex);
         
+        // 解析总页数（2字节，4个hex字符）
+        std::string totalPageHex = result.substr(8, 4);
+        uint16_t totalPage = (uint16_t)AppUtil::HexStrToUInt32(std::string("0000") + totalPageHex);  // 补0到8位
+        if (outTotalPage) *outTotalPage = totalPage;
+        AppUtil::SaveLog("[RestoreFromImage] Total page: ", std::to_string(totalPage));
+        
         // 解析文件名（512个hex字符 = 256字节）
-        std::string fileNameHex = result.substr(8, 512);
+        std::string fileNameHex = result.substr(12, 512);  // 8+4=12
         std::string fileName = AppUtil::HexStrToStr(fileNameHex);
-        size_t realNameEnd = fileName.find_last_not_of('0'); // 找到最后一个不是null的字符
+        size_t realNameEnd = fileName.find_last_not_of('0');
         if (realNameEnd != std::string::npos) {
             fileName = fileName.substr(0, realNameEnd + 1);
         }
         
         // 解析文件内容长度
-        std::string contentLenHex = result.substr(520, 8);  // 8 + 512 = 520
+        std::string contentLenHex = result.substr(524, 8);  // 8+4+512=524
         uint32_t contentLength = AppUtil::HexStrToUInt32(contentLenHex);
         
-        // 提取文件内容（从第528个字符开始）
-        fileContentHex = result.substr(528);
+        // 提取文件内容（从第532个字符开始）
+        fileContentHex = result.substr(532);
         
         // 计算实际读取的内容长度
         size_t actualHexLen = fileContentHex.length();
         size_t expectedHexLen = contentLength * 2;
         
-        // 根据文件内容长度截断（处理奇数长度情况）
+        // 根据文件内容长度截断
         if (actualHexLen > expectedHexLen) {
             fileContentHex = fileContentHex.substr(0, expectedHexLen);
             AppUtil::SaveLog("[RestoreFromImage] Truncated content from ", std::to_string(actualHexLen),
@@ -1004,7 +1040,8 @@ static std::vector<FileInfo> GetImageFilesSorted(const std::wstring& folderPath)
 std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
                                          std::string* outFileName,
                                          std::string* outFileContentHex,
-                                         std::function<void(int, int, const std::wstring&)> progressCallback)
+                                         std::function<void(int, int, const std::wstring&)> progressCallback,
+                                         uint16_t* outTotalPage)
 {
     std::string result;
     
@@ -1037,7 +1074,9 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
         std::string pageFileName;
         std::string pageFileContentHex;
         bool isFirst = (i == 0);
-        std::string pageData = RestoreFromImage(files[i].path, &pageFileName, &pageFileContentHex, isFirst);
+        uint16_t pageTotalPage = 0;
+        std::string pageData = RestoreFromImage(files[i].path, &pageFileName, &pageFileContentHex, isFirst,
+                                                isFirst ? outTotalPage : nullptr);
         
         // 处理完后立即释放该页缓存，节省内存
         int curPage = static_cast<int>(i + 1);
@@ -1052,8 +1091,8 @@ std::string DrawGrid::RestoreFromFolder(const std::wstring& folderPath,
                 *outFileName = pageFileName;
             }
             // 从第一页数据中解析文件内容长度
-            if (pageData.size() >= 528) {  // 8 + 512 + 8 = 528
-                std::string contentLenHex = pageData.substr(520, 8);
+            if (pageData.size() >= 532) {  // 8+4+512+8 = 532
+                std::string contentLenHex = pageData.substr(524, 8);  // 8+4+512 = 524
                 expectedContentLength = AppUtil::HexStrToUInt32(contentLenHex);
                 // 预分配 allFileContentHex
                 allFileContentHex.reserve(expectedContentLength * 2 + 64);

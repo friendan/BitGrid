@@ -340,8 +340,11 @@ std::string AppUtil::GetFileDrawHexString(HWND hParent){
     uint32_t contentLength = fileHexStr.size() / 2;
     std::string contentLenHex = AppUtil::UInt32ToHexStr(contentLength);
     
+    // 新格式：文件名长度(8) + 总页数(4) + 文件名(512) + 内容长度(8) + 内容
+    std::string totalPageHex = AppUtil::UInt16ToHexStr(1);  // 默认总页数为1
+    
     std::ostringstream oss;
-    oss << nameLenHex << fileNameHexStr << contentLenHex << fileHexStr;
+    oss << nameLenHex << totalPageHex << fileNameHexStr << contentLenHex << fileHexStr;
 
     // AppUtil::SaveLog("[GetFileDrawHexString] fileName=", fileName, 
     //                  " contentLength=", std::to_string(contentLength),

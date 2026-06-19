@@ -203,6 +203,19 @@ public:
         // 读取配置文件
         LoadConfig();
         
+        // 如果存在 1.png，从协议头解析总页数
+        std::wstring todayDir = PathUtil::GetTodayFolderPath();
+        std::wstring firstPng = todayDir + L"\\1.png";
+        if (GetFileAttributesW(firstPng.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            uint16_t totalPageFromImage = 0;
+            DrawGrid::RestoreFromImage(firstPng, nullptr, nullptr, true, &totalPageFromImage);
+            if (totalPageFromImage > 0) {
+                SetTotalPage(totalPageFromImage);
+                SaveConfig();
+                AddLog(L"[INFO] 已从截图文件恢复总页数: " + std::to_wstring(totalPageFromImage));
+            }
+        }
+        
         // 创建定时器：每 500ms 刷新一次日志队列到 UI
         SetTimer(this->Hwnd(), 1001, 500, nullptr);
         
@@ -256,8 +269,10 @@ public:
         }
         
         std::string pageFileName, pageContentHex;
+        uint16_t totalPageFromImage = 0;
         std::string pageData = DrawGrid::RestoreFromImage(path,
-            &pageFileName, &pageContentHex, (page == 1));
+            &pageFileName, &pageContentHex, (page == 1),
+            (page == 1) ? &totalPageFromImage : nullptr);
         if (pageData.empty()) {
             //PostLog(L"[ERROR] CRC32 校验失败，截图可能异常");
             return false;
@@ -392,6 +407,17 @@ public:
             
             // 校验通过，重置错误计数
             errorCount = 0;
+            
+            // 第1张截图后，从协议头解析总页数并自动更新 UI
+            if (page == 1) {
+                uint16_t totalPageFromImage = 0;
+                DrawGrid::RestoreFromImage(pngPath, nullptr, nullptr, true, &totalPageFromImage);
+                if (totalPageFromImage > 0) {
+                    totalPage = totalPageFromImage;
+                    PostMessage(this->Hwnd(), WM_USER + 104, totalPageFromImage, 0);
+                    PostLog(L"[INFO] 已自动识别总页数: " + std::to_wstring(totalPage));
+                }
+            }
             
             if (page >= totalPage) {
                 //PostLog(L"[INFO] 所有页面截图完成");
@@ -564,12 +590,19 @@ public:
                 {
                     std::string pageFileName;
                     std::string pageContentHex;
+                    uint16_t totalPageFromImage = 0;
                     std::string pageData = DrawGrid::RestoreFromImage(outPng,
-                        &pageFileName, &pageContentHex, false);
+                        &pageFileName, &pageContentHex, true, &totalPageFromImage);
                     if (pageData.empty()) {
                         AddLog(L"[ERROR] CRC32 校验失败，截图可能异常");
                         UpdateStatus(L"截图异常", L"", L"");
                     } else {
+                        // 从协议头解析总页数
+                        if (totalPageFromImage > 0) {
+                            SetTotalPage(totalPageFromImage);
+                            SaveConfig();
+                            AddLog(L"[INFO] 已自动识别总页数: " + std::to_wstring(totalPageFromImage));
+                        }
                         // 状态栏显示文件名
                         size_t lastSlash = outPng.find_last_of(L"\\");
                         std::wstring shortName = (lastSlash != std::wstring::npos) ? outPng.substr(lastSlash + 1) : outPng;
@@ -690,6 +723,15 @@ public:
                 
                 std::wstring wFileName = AppUtil::StrToWStr(fileName);
                 wFileName = PathUtil::SanitizeFileName(wFileName, L"restored.bin");
+                // 截断文件名防止超过 MAX_PATH（260字符），保留扩展名
+                if (wFileName.size() > 100) {
+                    size_t dotPos = wFileName.find_last_of(L'.');
+                    if (dotPos != std::wstring::npos && dotPos < 100) {
+                        wFileName = wFileName.substr(0, 96) + wFileName.substr(dotPos);
+                    } else {
+                        wFileName = wFileName.substr(0, 100);
+                    }
+                }
 
                 // 在 exe 目录下创建 file 子目录
                 std::wstring fileDir = PathUtil::GetExeDir() + L"\\file";
@@ -779,6 +821,15 @@ public:
                             reinterpret_cast<LPARAM>(new std::pair<std::string, std::string>(fileName, fileContentHex)));
                     }).detach();
                 }
+            }
+            return 0;
+        }
+        else if (msg == WM_USER + 104) {
+            // 自动设置总页数
+            if (wParam > 0) {
+                SetTotalPage((int)wParam);
+                SaveConfig();
+                AddLog(L"[INFO] 已自动识别总页数: " + std::to_wstring((int)wParam));
             }
             return 0;
         }

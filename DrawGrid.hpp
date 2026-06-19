@@ -33,10 +33,13 @@ public:
 	void DrawHexStringToDIB(uint32_t* pPixels, int width, int height);
 
 	void SetHexString(const std::string& hexString);
+	void SetHexStringWithTotalPage(const std::string& hexString, uint16_t totalPage);
+	// 从 hex 数据长度和每页大小计算总页数并写入协议头
+	void UpdateTotalPageInHeader(uint16_t totalPage);
 	
-	// 设置带文件名和文件长度的数据（新格式）
-	// 格式：文件名长度(4字节) + 文件名(256字节) + 文件内容长度(4字节) + 文件内容
-	void SetFileData(const std::string& fileName, const std::string& fileContentHex);
+	// 设置带文件名和文件长度的数据
+	// 格式：文件名长度(4字节) + 总页数(2字节) + 文件名(256字节) + 文件内容长度(4字节) + 文件内容
+	void SetFileData(const std::string& fileName, const std::string& fileContentHex, uint16_t totalPage = 0);
 	
 	const std::string& GetHexString() const { return mHexString; }
 	int GetCurPage() const { return mCurPage; }
@@ -54,14 +57,16 @@ public:
 	static std::string RestoreFromImage(const std::wstring& imagePath, 
 	                                     std::string* outFileName = nullptr,
 	                                     std::string* outFileContentHex = nullptr,
-	                                     bool isFirstPage = true);
+	                                     bool isFirstPage = true,
+	                                     uint16_t* outTotalPage = nullptr);
 	// 多页情况：传入文件夹路径，返回还原的十六进制字符串（按文件创建时间排序）
 	// 输出参数：outFileName 返回文件名，outFileContentHex 返回文件内容的十六进制
 	// progressCallback: 进度回调函数，参数为(当前文件索引, 总文件数, 当前文件路径)
 	static std::string RestoreFromFolder(const std::wstring& folderPath,
 	                                      std::string* outFileName = nullptr,
 	                                      std::string* outFileContentHex = nullptr,
-	                                      std::function<void(int, int, const std::wstring&)> progressCallback = nullptr);
+	                                      std::function<void(int, int, const std::wstring&)> progressCallback = nullptr,
+	                                      uint16_t* outTotalPage = nullptr);
 
 	// 设置/获取页缓存（页码 → 还原后的hex数据），RestoreFromFolder 会优先使用缓存
 	static void SetPageCache(int page, const std::string& data);
