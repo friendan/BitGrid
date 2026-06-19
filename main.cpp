@@ -477,9 +477,31 @@ public:
         
         if (batch.empty()) return;
         
-        // 一次性追加到日志框
+        // 获取当前文本
         std::wstring currentText = AppUtil::StrToWStr(logBox->GetText().c_str());
-        logBox->SetText((currentText + batch).c_str());
+        currentText += batch;
+        
+        // 限制最多 1024 行：计算行数，保留最后 1024 行
+        const int maxLines = 1024;
+        int lineCount = 0;
+        for (size_t i = 0; i < currentText.size(); i++) {
+            if (currentText[i] == L'\n') lineCount++;
+        }
+        if (lineCount > maxLines) {
+            // 找到第 (lineCount - maxLines) 个换行符的位置
+            int removeLines = lineCount - maxLines;
+            size_t pos = 0;
+            for (int i = 0; i < removeLines; i++) {
+                pos = currentText.find(L'\n', pos);
+                if (pos == std::wstring::npos) break;
+                pos++;
+            }
+            if (pos != std::wstring::npos && pos < currentText.size()) {
+                currentText = currentText.substr(pos);
+            }
+        }
+        
+        logBox->SetText(currentText.c_str());
         
         // 自动滚动到底部
         auto* sb = logBox->GetScrollBar();
