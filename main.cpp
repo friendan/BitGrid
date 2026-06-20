@@ -248,6 +248,13 @@ public:
     }
     
     /// 模拟按键（keybd_event + 正确 scan code）
+    // 自适应等待时间：根据 CaptureAndVerify 实际耗时动态调整
+    int m_pageTurnWaitMs = 200;        // 当前等待时间
+    std::vector<DWORD> m_recentCostMs; // 最近成功耗时记录
+    static constexpr int MAX_RECORD_COUNT = 5;
+    static constexpr int MIN_WAIT_MS = 60;
+    static constexpr int MAX_WAIT_MS = 500;
+
     void SimulateKeyPress(int vkKey) {
         BYTE scanCode = (BYTE)MapVirtualKeyA(vkKey, MAPVK_VK_TO_VSC);
         // 按键按下
@@ -388,25 +395,47 @@ public:
                 return;
             }
             
-            // 截图
+            // 截图（含失败重试）
             std::wstring pngPath = dir + L"\\" + std::to_wstring(page) + L".png";
-            if (!CaptureAndVerify(pngPath, dir, page, totalPage)) {
+            DWORD tickStart = GetTickCount();
+            while (true) {
+                if (!isAutoActionRunning.load()) {
+                    PostLog(L"[INFO] 用户中断自动操作");
+                    return;
+                }
+                if (CaptureAndVerify(pngPath, dir, page, totalPage)) break;
                 errorCount++;
                 if (errorCount >= maxErrors) {
                     PostLog(L"[ERROR] CRC校验连续失败" + std::to_wstring(maxErrors) + L"次，流程终止");
-                    // 删除最后一张异常图片
                     if (DeleteFileW(pngPath.c_str())) {
                         PostLog(L"[INFO] 已删除异常图片: " + pngPath);
                     }
                     FinishAutoAction(false);
                     return;
                 }
-                Sleep(100);
-                continue;
+                Sleep(50);
             }
-            
-            // 校验通过，重置错误计数
+            // 从第一次尝试到成功的总耗时
+            DWORD capCost = GetTickCount() - tickStart;
             errorCount = 0;
+            
+            // 记录成功耗时用于调整翻页等待
+            m_recentCostMs.push_back(capCost);
+            if (m_recentCostMs.size() > MAX_RECORD_COUNT) {
+                m_recentCostMs.erase(m_recentCostMs.begin());
+            }
+            // 计算最近几次成功耗时的平均值
+            DWORD sum = 0;
+            for (auto& t : m_recentCostMs) sum += t;
+            DWORD avg = sum / (DWORD)m_recentCostMs.size();
+            
+            // 等待时间 = 平均耗时 × 1.15（留15%余量），限制在上下限之间
+            int targetWait = (int)(avg * 1.15);
+            if (targetWait > MAX_WAIT_MS) targetWait = MAX_WAIT_MS;
+            if (targetWait < MIN_WAIT_MS) targetWait = MIN_WAIT_MS;
+            m_pageTurnWaitMs = targetWait;
+            
+            AppUtil::SaveLog("[AutoAction] page=", page, " costMs=", (int)capCost, " avgMs=", (int)avg, " waitMs=", targetWait, " errorCount=", errorCount);
             
             // 第1张截图后，从协议头解析总页数并自动更新 UI
             if (page == 1) {
@@ -415,7 +444,6 @@ public:
                 if (totalPageFromImage > 0) {
                     totalPage = totalPageFromImage;
                     PostMessage(this->Hwnd(), WM_USER + 104, totalPageFromImage, 0);
-                    PostLog(L"[INFO] 已自动识别总页数: " + std::to_wstring(totalPage));
                 }
             }
             
@@ -426,7 +454,7 @@ public:
             
             // 翻页
             SimulatePageTurn(centerX, centerY);
-            Sleep(300);
+            Sleep(m_pageTurnWaitMs);
             page++;
         }
         
