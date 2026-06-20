@@ -79,3 +79,28 @@ bool ScreenCapture::CaptureRectToPng(const RECT& rcScreen, const std::wstring& o
     }
     return true;
 }
+
+// 截图到内存，返回 Gdiplus::Bitmap*（调用方负责 delete），失败返回 nullptr
+Gdiplus::Bitmap* ScreenCapture::CaptureToBitmap(const RECT& rcScreen)
+{
+    int w = rcScreen.right - rcScreen.left;
+    int h = rcScreen.bottom - rcScreen.top;
+    if (w <= 0 || h <= 0) return nullptr;
+
+    HDC hdcScreen = GetDC(nullptr);
+    HDC hdcMem = CreateCompatibleDC(hdcScreen);
+    HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, w, h);
+    HGDIOBJ hOld = SelectObject(hdcMem, hBitmap);
+    
+    BitBlt(hdcMem, 0, 0, w, h, hdcScreen, rcScreen.left, rcScreen.top, SRCCOPY);
+    
+    SelectObject(hdcMem, hOld);
+    
+    Gdiplus::Bitmap* bmp = new Gdiplus::Bitmap(hBitmap, nullptr);
+    
+    DeleteObject(hBitmap);
+    DeleteDC(hdcMem);
+    ReleaseDC(nullptr, hdcScreen);
+    
+    return bmp;
+}
