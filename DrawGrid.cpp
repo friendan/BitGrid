@@ -715,7 +715,132 @@ COLORREF DrawGrid::ColorToRGB(const Gdiplus::Color& color){
 }
 
 //=============================================================================
-// 从单张图片还原十六进制字符串
+// 内部：从 Gdiplus::Bitmap 还原十六进制字符串（不含缓存和文件加载）
+//=============================================================================
+static std::string RestoreFromBitmapInternal(Gdiplus::Bitmap* bitmap,
+                                               std::string* outFileName,
+                                               std::string* outFileContentHex,
+                                               bool isFirstPage,
+                                               uint16_t* outTotalPage)
+{
+    std::string result;
+    
+    if (outFileName) outFileName->clear();
+    if (outFileContentHex) outFileContentHex->clear();
+    
+    int width = bitmap->GetWidth();
+    int height = bitmap->GetHeight();
+    
+    // LockBits 一次性锁定全部像素
+    Gdiplus::Rect lockRect(0, 0, width, height);
+    Gdiplus::BitmapData bmd;
+    if (bitmap->LockBits(&lockRect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bmd) != Gdiplus::Ok) {
+        AppUtil::SaveLog("[RestoreFromImage] LockBits failed");
+        return result;
+    }
+    
+    const uint32_t* pixels = (const uint32_t*)bmd.Scan0;
+    int stride = bmd.Stride;
+    int stridePixels = stride / 4;
+    
+    // 查找边框位置
+    int left, top, right, bottom;
+    if (!FindBorderFast(pixels, stride, width, height, left, top, right, bottom)) {
+        AppUtil::SaveLog("[RestoreFromImage] FindBorder failed");
+        bitmap->UnlockBits(&bmd);
+        return result;
+    }
+    
+    const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
+    const static int& lineCount = AppConst::BORDER_LINE_COUNT;
+    
+    int xStart = left + lineCount;
+    int yStart = top + lineCount;
+    int xEnd = right - lineCount + 1;
+    int yEnd = bottom - lineCount + 1;
+    
+    int drawWidth = xEnd - xStart;
+    int drawHeight = yEnd - yStart;
+    
+    if (drawWidth <= 0 || drawHeight <= 0) {
+        AppUtil::SaveLog("[RestoreFromImage] Invalid draw size");
+        bitmap->UnlockBits(&bmd);
+        return result;
+    }
+    
+    result.reserve(drawWidth * drawHeight / 4 + 8);
+    
+    uint8_t bits[4] = {0};
+    int bitIndex = 0;
+    for (int y = yStart; y < yEnd; y++) {
+        const uint32_t* row = pixels + y * stridePixels;
+        for (int x = xStart; x < xEnd; x++) {
+            uint32_t argb = row[x];
+            COLORREF rgbColor = RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
+            uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
+            if (bit == 255) break;
+            bits[bitIndex++] = bit;
+            if (bitIndex >= 4) {
+                result += AppUtil::BitsToHexChar(bits);
+                bitIndex = 0;
+            }
+        }
+    }
+    
+    if (bitIndex > 0) {
+        while (bitIndex < 4) bits[bitIndex++] = 0;
+        result += AppUtil::BitsToHexChar(bits);
+    }
+    
+    bitmap->UnlockBits(&bmd);
+    
+    // CRC32 校验
+    if (result.size() >= 8) {
+        std::string crcHex = result.substr(result.size() - 8);
+        uint32_t storedCrc = AppUtil::HexStrToUInt32(crcHex);
+        std::string dataHex = result.substr(0, result.size() - 8);
+        uint32_t calcCrc = AppUtil::Crc32(dataHex.data(), dataHex.size());
+        if (storedCrc != calcCrc) {
+            AppUtil::SaveLog("[RestoreFromImage] CRC mismatch");
+            return "";
+        }
+        result = dataHex;
+    }
+    
+    // 解析文件头
+    std::string fileContentHex = result;
+    if (isFirstPage && result.size() >= 532) {
+        std::string nameLenHex = result.substr(0, 8);
+        uint32_t nameLen = AppUtil::HexStrToUInt32(nameLenHex);
+        
+        std::string totalPageHex = result.substr(8, 4);
+        uint16_t totalPage = (uint16_t)AppUtil::HexStrToUInt32(std::string("0000") + totalPageHex);
+        if (outTotalPage) *outTotalPage = totalPage;
+        
+        std::string fileNameHex = result.substr(12, 512);
+        std::string fileName = AppUtil::HexStrToStr(fileNameHex);
+        size_t realNameEnd = fileName.find_last_not_of('0');
+        if (realNameEnd != std::string::npos) {
+            fileName = fileName.substr(0, realNameEnd + 1);
+        }
+        if (outFileName && !fileName.empty()) *outFileName = fileName;
+        
+        std::string contentLenHex = result.substr(524, 8);
+        uint32_t contentLength = AppUtil::HexStrToUInt32(contentLenHex);
+        fileContentHex = result.substr(532);
+        size_t actualHexLen = fileContentHex.length();
+        size_t expectedHexLen = contentLength * 2;
+        if (actualHexLen > expectedHexLen) {
+            fileContentHex = fileContentHex.substr(0, expectedHexLen);
+        }
+    }
+    
+    if (outFileContentHex) *outFileContentHex = fileContentHex;
+    return result;
+}
+
+//=============================================================================
+// 从单张图片还原十六进制字符串（文件路径版本）
 //=============================================================================
 std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath, 
                                         std::string* outFileName,
@@ -767,216 +892,34 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
         } catch (...) {}
     }
     
-    //AppUtil::SaveLog("[RestoreFromImage] Start");
-    //AppUtil::SaveLog("[RestoreFromImage] Image path: ", AppUtil::WStrToStr(imagePath));
-    //AppUtil::SaveLog("[RestoreFromImage] isFirstPage: ", isFirstPage ? "true" : "false");
-    
-    // 加载图片
+    // 加载图片并委托给内部函数
     Gdiplus::Bitmap* bitmap = Gdiplus::Bitmap::FromFile(imagePath.c_str());
     if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
         AppUtil::SaveLog("[RestoreFromImage] Failed to load image");
-        if (bitmap) {
-            AppUtil::SaveLog("[RestoreFromImage] Bitmap status: ", std::to_string(bitmap->GetLastStatus()));
-            delete bitmap;
-        }
+        if (bitmap) delete bitmap;
         return result;
     }
     
-    int width = bitmap->GetWidth();
-    int height = bitmap->GetHeight();
-    
-    // LockBits 一次性锁定全部像素
-    Gdiplus::Rect lockRect(0, 0, width, height);
-    Gdiplus::BitmapData bmd;
-    if (bitmap->LockBits(&lockRect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bmd) != Gdiplus::Ok) {
-        AppUtil::SaveLog("[RestoreFromImage] LockBits failed");
-        delete bitmap;
-        return result;
-    }
-    
-    const uint32_t* pixels = (const uint32_t*)bmd.Scan0;
-    int stride = bmd.Stride;
-    int stridePixels = stride / 4;
-    
-    // 查找边框位置
-    int left, top, right, bottom;
-    if (!FindBorderFast(pixels, stride, width, height, left, top, right, bottom)) {
-        AppUtil::SaveLog("[RestoreFromImage] FindBorder failed");
-        bitmap->UnlockBits(&bmd);
-        delete bitmap;
-        return result;
-    }
-    
-    const static int& lineOffset = AppConst::BORDER_LINE_OFFSET;
-    const static int& lineCount = AppConst::BORDER_LINE_COUNT;
-    
-    // 计算真实绘制区域（去掉边框）
-    int xStart = left + lineCount;
-    int yStart = top + lineCount;
-    int xEnd = right - lineCount + 1;
-    int yEnd = bottom - lineCount + 1;
-    
-    int drawWidth = xEnd - xStart;
-    int drawHeight = yEnd - yStart;
-    
-    if (drawWidth <= 0 || drawHeight <= 0) {
-        AppUtil::SaveLog("[RestoreFromImage] Invalid draw size");
-        bitmap->UnlockBits(&bmd);
-        delete bitmap;
-        return result;
-    }
-    
-    // 预分配结果字符串
-    result.reserve(drawWidth * drawHeight / 4 + 8);
-    
-    // 读取像素并还原为十六进制字符串（使用 LockBits 内存直接访问）
-    uint8_t bits[4] = {0};
-    int bitIndex = 0;
-
-    for (int y = yStart; y < yEnd; y++) {
-        const uint32_t* row = pixels + y * stridePixels;
-        
-        for (int x = xStart; x < xEnd; x++) {
-            uint32_t argb = row[x];
-            COLORREF rgbColor = RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
-            uint8_t bit = AppUtil::GetRgbColorBit(rgbColor);
-
-            // 遇到无效颜色（背景色），停止当前行
-            if (bit == 255) {
-                break;
-            }
-            
-            bits[bitIndex++] = bit;
-            if (bitIndex >= 4) {
-                result += AppUtil::BitsToHexChar(bits);
-                bitIndex = 0;
-            }
-        }
-    }
-    
-    // 处理剩余的bits（不足4个时用0填充）
-    if (bitIndex > 0) {
-        AppUtil::SaveLog("[RestoreFromImage] Pixel padding");
-        while (bitIndex < 4) {
-            bits[bitIndex++] = 0;
-        }
-        result += AppUtil::BitsToHexChar(bits);
-    }
-    
-    bitmap->UnlockBits(&bmd);
-    
-    //AppUtil::SaveLog("[RestoreFromImage] Total pixels: ", std::to_string(totalPixels));
-    
-    // 提取末尾 CRC32 并校验
-    std::string crcInfo;
-    if (result.size() >= 8) {
-        std::string crcHex = result.substr(result.size() - 8);
-        uint32_t storedCrc = AppUtil::HexStrToUInt32(crcHex);
-        std::string dataHex = result.substr(0, result.size() - 8);
-        uint32_t calcCrc = AppUtil::Crc32(dataHex.data(), dataHex.size());
-        
-        char crcBuf[32];
-        snprintf(crcBuf, sizeof(crcBuf), "[CRC32] stored=0x%08X calc=0x%08X", storedCrc, calcCrc);
-        crcInfo = std::string(crcBuf);
-        
-        if (storedCrc == calcCrc) {
-            crcInfo += " OK";
-            // 去掉末尾的 CRC32，只保留数据
-            result = dataHex;
-        } else {
-            //crcInfo += " MISMATCH!";
-            //AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
-            delete bitmap;
-            return "";
-        }
-        //AppUtil::SaveLog("[RestoreFromImage] ", crcInfo);
-    }
-    
-    // 输出十六进制字符串长度和对应的字节数
-    size_t resultLen = result.length();
-    size_t resultBytes = resultLen / 2;
-    char hexBuf1[16];
-    snprintf(hexBuf1, sizeof(hexBuf1), "0x%zX", resultLen);
-    //AppUtil::SaveLog("[RestoreFromImage] Result hex length: ", std::to_string(resultLen), " bytes (", std::string(hexBuf1), ") [", std::to_string(resultBytes), " data bytes]");
-        
+    result = RestoreFromBitmapInternal(bitmap, outFileName, outFileContentHex, isFirstPage, outTotalPage);
     delete bitmap;
-    //AppUtil::SaveLog("[RestoreFromImage] End");
-
-    // 解析新格式：文件名长度(8hex) + 总页数(4hex) + 文件名(512hex) + 文件内容长度(8hex) + 文件内容
-    // 文件头固定 8+4+512+8 = 532 hex字符
-    std::string fileContentHex = result;
-    if (isFirstPage && result.size() >= 532) {
-        // 解析文件名长度（应该固定为256）
-        std::string nameLenHex = result.substr(0, 8);
-        uint32_t nameLen = AppUtil::HexStrToUInt32(nameLenHex);
-        
-        // 解析总页数（2字节，4个hex字符）
-        std::string totalPageHex = result.substr(8, 4);
-        uint16_t totalPage = (uint16_t)AppUtil::HexStrToUInt32(std::string("0000") + totalPageHex);  // 补0到8位
-        if (outTotalPage) *outTotalPage = totalPage;
-        AppUtil::SaveLog("[RestoreFromImage] Total page: ", std::to_string(totalPage));
-        
-        // 解析文件名（512个hex字符 = 256字节）
-        std::string fileNameHex = result.substr(12, 512);  // 8+4=12
-        std::string fileName = AppUtil::HexStrToStr(fileNameHex);
-        size_t realNameEnd = fileName.find_last_not_of('0');
-        if (realNameEnd != std::string::npos) {
-            fileName = fileName.substr(0, realNameEnd + 1);
-        }
-        
-        // 解析文件内容长度
-        std::string contentLenHex = result.substr(524, 8);  // 8+4+512=524
-        uint32_t contentLength = AppUtil::HexStrToUInt32(contentLenHex);
-        
-        // 提取文件内容（从第532个字符开始）
-        fileContentHex = result.substr(532);
-        
-        // 计算实际读取的内容长度
-        size_t actualHexLen = fileContentHex.length();
-        size_t expectedHexLen = contentLength * 2;
-        
-        // 根据文件内容长度截断
-        if (actualHexLen > expectedHexLen) {
-            fileContentHex = fileContentHex.substr(0, expectedHexLen);
-            AppUtil::SaveLog("[RestoreFromImage] Truncated content from ", std::to_string(actualHexLen),
-                           " to ", std::to_string(expectedHexLen), " hex chars");
-        }
-        
-        AppUtil::SaveLog("[RestoreFromImage] File name length: ", std::to_string(nameLen), " bytes");
-        AppUtil::SaveLog("[RestoreFromImage] File name: ", fileName);
-        AppUtil::SaveLog("[RestoreFromImage] Expected content length: ", std::to_string(contentLength), " bytes (", std::to_string(expectedHexLen), " hex chars)");
-        AppUtil::SaveLog("[RestoreFromImage] Actual content length: ", std::to_string(fileContentHex.length()), " hex chars (", std::to_string(fileContentHex.length() / 2), " bytes)");
-        
-        // 检查完整性
-        if (actualHexLen == expectedHexLen) {
-            AppUtil::SaveLog("[RestoreFromImage] ✓ Content integrity: COMPLETE (完全识别)");
-        } else if (actualHexLen < expectedHexLen) {
-            size_t missingBytes = (expectedHexLen - actualHexLen) / 2;
-            AppUtil::SaveLog("[RestoreFromImage] ⚠ Content integrity: INCOMPLETE (缺少 ", std::to_string(missingBytes), " 字节)");
-        } else {
-            size_t extraBytes = (actualHexLen - expectedHexLen) / 2;
-            AppUtil::SaveLog("[RestoreFromImage] ⚠ Content integrity: EXTRA DATA (多了 ", std::to_string(extraBytes), " 字节，已截断)");
-        }
-        
-        // 通过输出参数返回解析结果
-        if (outFileName) {
-            *outFileName = fileName;
-        }
-    } else if (!isFirstPage) {
-        // 非第一页：所有数据都是文件内容
-        //AppUtil::SaveLog("[RestoreFromImage] Non-first page, all data is file content");
-        size_t contentLen = fileContentHex.length();
-        size_t contentBytes = contentLen / 2;
-        char hexBuf2[16];
-        snprintf(hexBuf2, sizeof(hexBuf2), "0x%zX", contentLen);
-        //AppUtil::SaveLog("[RestoreFromImage] File content hex length: ", std::to_string(contentLen), " bytes (", std::string(hexBuf2), ") [", std::to_string(contentBytes), " data bytes]");
-    }
-    
-    if (outFileContentHex) {
-        *outFileContentHex = fileContentHex;
-    }
     
     return result;
+}
+
+//=============================================================================
+// 从单张图片还原十六进制字符串（内存 Bitmap 版本）
+//=============================================================================
+std::string DrawGrid::RestoreFromImage(Gdiplus::Bitmap* bitmap,
+                                        std::string* outFileName,
+                                        std::string* outFileContentHex,
+                                        bool isFirstPage,
+                                        uint16_t* outTotalPage)
+{
+    // 清空输出参数
+    if (outFileName) outFileName->clear();
+    if (outFileContentHex) outFileContentHex->clear();
+    
+    return RestoreFromBitmapInternal(bitmap, outFileName, outFileContentHex, isFirstPage, outTotalPage);
 }
 
 //=============================================================================

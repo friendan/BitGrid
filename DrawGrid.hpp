@@ -51,10 +51,14 @@ public:
 
 	static COLORREF ColorToRGB(const Gdiplus::Color& color);
 
-	// 从截图还原十六进制字符串
-	// 单页情况：传入图片路径，返回还原的十六进制字符串
-	// 输出参数：outFileName 返回文件名，outFileContentHex 返回文件内容的十六进制
+	// 从截图还原十六进制字符串（传入文件路径）
 	static std::string RestoreFromImage(const std::wstring& imagePath, 
+	                                     std::string* outFileName = nullptr,
+	                                     std::string* outFileContentHex = nullptr,
+	                                     bool isFirstPage = true,
+	                                     uint16_t* outTotalPage = nullptr);
+	// 从截图还原十六进制字符串（传入内存 Bitmap，调用方负责释放 bitmap）
+	static std::string RestoreFromImage(Gdiplus::Bitmap* bitmap,
 	                                     std::string* outFileName = nullptr,
 	                                     std::string* outFileContentHex = nullptr,
 	                                     bool isFirstPage = true,
