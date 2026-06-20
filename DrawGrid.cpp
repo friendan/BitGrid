@@ -418,6 +418,9 @@ void DrawGrid::NextPage(){
     if(mCurPage > mTotalPage){
         mCurPage = mTotalPage;
     }
+    // 记录翻页时间戳，供 UpdatePixelOverlayFromDrawGrid 计算耗时
+    m_pageTurnTick = GetTickCount();
+    m_pageTurnCost = 0;
 }
 
 void DrawGrid::ChangePage(int chVal){

@@ -440,7 +440,7 @@ public:
             if (targetWait < MIN_WAIT_MS) targetWait = MIN_WAIT_MS;
             m_pageTurnWaitMs = targetWait;
             
-            AppUtil::SaveLog("[AutoAction] page=", page, " costMs=", (int)capCost, " avgMs=", (int)avg, " waitMs=", targetWait, " errorCount=", errorCount);
+            //AppUtil::SaveLog("[AutoAction] page=", page, " costMs=", (int)capCost, " avgMs=", (int)avg, " waitMs=", targetWait, " errorCount=", errorCount);
             
             // 第1张截图后，从协议头解析总页数并自动更新 UI
             if (page == 1) {

@@ -87,6 +87,8 @@ public:
     size_t mDrawHeight = 0;
     size_t mHexCharNum = 0;
     uint32_t mCurPageCrc32 = 0;  // 当前页 CRC32
+    DWORD m_pageTurnCost = 0;     // 最近一次翻页耗时（ms）
+    DWORD m_pageTurnTick = 0;     // 翻页时的时间戳
     // std::string mHexString = "0123456789ABCDEF";
     std::string mHexString;
 

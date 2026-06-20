@@ -1716,10 +1716,12 @@ void snake::Application::UpdateDrawGridInfo(){
 	// 	lastFileSize = curFileSize;
 	// }
 
-    // 在状态栏的最后一格显示如下内容：文件大小 | 每页hex数 | 当前页hex数 | 当前页CRC32 | 总页数 | 当前页
+    // 在状态栏的最后一格显示如下内容：文件大小 | 每页hex数 | 当前页hex数 | 当前页CRC32 | 翻页耗时 | 总页数 | 当前页
     // 只有数据变化时才更新
+    DWORD curPageTurnCost = pDrawGrid->m_pageTurnCost;
+    
     if (curFileSize != lastFileSize || curPageSize != lastPageSize || curTotalPage != lastTotalPage || curCurPage != lastCurPage || curHexCharNum != lastHexCharNum || curCrc32 != lastCrc32 || m_bForceRefresh) {
-        swprintf_s(wszBuff, L"%zu#%zu#%zu#%08X#%zu#%zu", curFileSize, curPageSize, curHexCharNum, curCrc32, curTotalPage, curCurPage);
+        swprintf_s(wszBuff, L"%zu#%zu#%zu#%08X#%lu#%zu#%zu", curFileSize, curPageSize, curHexCharNum, curCrc32, curPageTurnCost, curTotalPage, curCurPage);
         UpdateStatusBarText(5, wszBuff);
         lastFileSize = curFileSize;
         lastPageSize = curPageSize;
@@ -1934,6 +1936,11 @@ void snake::Application::UpdatePixelOverlayFromDrawGrid() {
         m_overlayWidth, 
         m_overlayHeight
     );
+    
+    // 记录翻页耗时（从翻页到绘制完成的时间差）
+    if (DrawGrid::Inst()->m_pageTurnCost == 0) {
+        DrawGrid::Inst()->m_pageTurnCost = GetTickCount() - DrawGrid::Inst()->m_pageTurnTick;
+    }
 }
 
 // ============================================================================
