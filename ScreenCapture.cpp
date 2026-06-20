@@ -104,3 +104,11 @@ Gdiplus::Bitmap* ScreenCapture::CaptureToBitmap(const RECT& rcScreen)
     
     return bmp;
 }
+
+bool ScreenCapture::SaveBitmapToPng(Gdiplus::Bitmap* bitmap, const std::wstring& outPngPath)
+{
+    if (!bitmap) return false;
+    CLSID clsid{};
+    if (GetEncoderClsid(L"image/png", &clsid) < 0) return false;
+    return bitmap->Save(outPngPath.c_str(), &clsid, nullptr) == Gdiplus::Ok;
+}

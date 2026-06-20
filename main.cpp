@@ -269,19 +269,20 @@ public:
     
     /// 截图并校验，成功返回 true，失败则内部自动终止流程
     bool CaptureAndVerify(const std::wstring& path, const std::wstring& dir, int page, int totalPage) {
-        std::wstring err;
-        if (!ScreenCapture::CaptureRectToPng(selectedRectScreen, path, &err)) {
-            //PostLog(L"[ERROR] 截图失败: " + err);
+        // 截图到内存，不写磁盘
+        Gdiplus::Bitmap* bitmap = ScreenCapture::CaptureToBitmap(selectedRectScreen);
+        if (!bitmap) {
             return false;
         }
         
         std::string pageFileName, pageContentHex;
         uint16_t totalPageFromImage = 0;
-        std::string pageData = DrawGrid::RestoreFromImage(path,
+        std::string pageData = DrawGrid::RestoreFromImage(bitmap,
             &pageFileName, &pageContentHex, (page == 1),
             (page == 1) ? &totalPageFromImage : nullptr);
+        
         if (pageData.empty()) {
-            //PostLog(L"[ERROR] CRC32 校验失败，截图可能异常");
+            delete bitmap;
             return false;
         }
         
@@ -298,14 +299,19 @@ public:
                 prevData = tmp;
             }
             if (!prevData.empty() && pageData == prevData) {
-                //PostLog(L"[ERROR] 截图与上一张相同，翻页未成功");
+                delete bitmap;
                 return false;
             }
         }
         
+        // 所有验证通过，保存 PNG 文件
+        ScreenCapture::SaveBitmapToPng(bitmap, path);
+        delete bitmap;
+        
+        // 设置缓存
+        
         PostLog(L"[INFO] 已截图(" + std::to_wstring(page) + L"/" + std::to_wstring(totalPage) + L"): " + path);
         
-        // 所有验证通过，设置缓存
         DrawGrid::SetPageCache(page, pageData);
         
         size_t ls = path.find_last_of(L"\\");
