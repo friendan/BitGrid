@@ -417,7 +417,6 @@ public:
             }
             // 从第一次尝试到成功的总耗时
             DWORD capCost = GetTickCount() - tickStart;
-            errorCount = 0;
             
             // 记录成功耗时用于调整翻页等待
             m_recentCostMs.push_back(capCost);
@@ -429,8 +428,8 @@ public:
             for (auto& t : m_recentCostMs) sum += t;
             DWORD avg = sum / (DWORD)m_recentCostMs.size();
             
-            // 等待时间 = 平均耗时 × 1.15（留15%余量），限制在上下限之间
-            int targetWait = (int)(avg * 1.15);
+            // 等待时间 = 最近成功耗时平均值 - 50，限制在上下限之间
+            int targetWait = (int)avg - 50;
             if (targetWait > MAX_WAIT_MS) targetWait = MAX_WAIT_MS;
             if (targetWait < MIN_WAIT_MS) targetWait = MIN_WAIT_MS;
             m_pageTurnWaitMs = targetWait;
@@ -453,6 +452,7 @@ public:
             }
             
             // 翻页
+            errorCount = 0;
             SimulatePageTurn(centerX, centerY);
             Sleep(m_pageTurnWaitMs);
             page++;
