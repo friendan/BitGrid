@@ -434,8 +434,8 @@ public:
             for (auto& t : m_recentCostMs) sum += t;
             DWORD avg = sum / (DWORD)m_recentCostMs.size();
             
-            // 等待时间 = 最近成功耗时平均值 - 50，限制在上下限之间
-            int targetWait = (int)avg - 50;
+            // 等待时间 = 最近成功耗时平均值 + 10，限制在上下限之间
+            int targetWait = (int)avg + 10;
             if (targetWait > MAX_WAIT_MS) targetWait = MAX_WAIT_MS;
             if (targetWait < MIN_WAIT_MS) targetWait = MIN_WAIT_MS;
             m_pageTurnWaitMs = targetWait;
