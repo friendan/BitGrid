@@ -763,7 +763,7 @@ public:
                 PathUtil::EnsureDirExists(fileDir);
                 
                 std::wstring outPath = fileDir + L"\\" + wFileName;
-                if (AppUtil::WriteHexStringToFile(fileContentHex, outPath)) {
+                if (AppUtil::WriteHexStringToFileW(fileContentHex, outPath)) {
                     AddLog(L"[INFO] 识别成功，已生成文件: " + outPath);
                     UpdateStatus(L"识别成功", L"", L"");
                     DrawGrid::ClearPageCache();

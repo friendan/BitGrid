@@ -826,6 +826,13 @@ static std::string RestoreFromBitmapInternal(Gdiplus::Bitmap* bitmap,
         if (realNameEnd != std::string::npos) {
             fileName = fileName.substr(0, realNameEnd + 1);
         }
+        // 兼容处理：截图文件名是 ANSI/GBK 编码，需转为 UTF-8
+        if (!fileName.empty()) {
+            std::wstring wFileName = AppUtil::AnsiToWStr(fileName);
+            if (!wFileName.empty()) {
+                fileName = AppUtil::WStrToStr(wFileName);
+            }
+        }
         if (outFileName && !fileName.empty()) *outFileName = fileName;
         
         std::string contentLenHex = result.substr(524, 8);
@@ -878,6 +885,13 @@ std::string DrawGrid::RestoreFromImage(const std::wstring& imagePath,
                         std::string nameHex = result.substr(12, 512);  // 8+4=12
                         std::string name = AppUtil::HexStrToStr(nameHex);
                         while (!name.empty() && name.back() == '0') name.pop_back();
+                        // 兼容处理：截图文件名是 ANSI/GBK 编码，需转为 UTF-8
+                        if (!name.empty()) {
+                            std::wstring wName = AppUtil::AnsiToWStr(name);
+                            if (!wName.empty()) {
+                                name = AppUtil::WStrToStr(wName);
+                            }
+                        }
                         if (!name.empty()) *outFileName = name;
                     }
                     std::string contentHex = result.substr(532);

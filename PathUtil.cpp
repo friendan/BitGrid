@@ -100,9 +100,9 @@ std::wstring PathUtil::NextPngPathInDir(const std::wstring& dir)
 std::wstring PathUtil::SanitizeFileName(const std::wstring& name, const std::wstring& fallbackName)
 {
     std::wstring s = name;
-    // 去掉路径分隔符、非法字符和不可打印字符（控制字符+高位字符）
+    // 去除 Windows 文件名非法字符：< > : " / \ | ? * 以及控制字符
     for (auto& ch : s) {
-        if (ch < L' ' || ch > L'~' || ch == L'<' || ch == L'>' || ch == L':' || ch == L'"' ||
+        if (ch < L' ' || ch == L'<' || ch == L'>' || ch == L':' || ch == L'"' ||
             ch == L'/' || ch == L'\\' || ch == L'|' || ch == L'?' || ch == L'*') {
             ch = L'_';
         }
