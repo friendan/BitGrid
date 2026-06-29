@@ -49,3 +49,46 @@ BitGrid.exe 工具栏上有两个区域选择按钮：
 ### 相关文件
 - `main.htm` — 按钮布局定义
 - `main.cpp` — 事件处理逻辑
+
+## 经验教训（2026-06-29）
+
+### 1. `std::ostringstream` 对超过 2GB 数据的截断问题
+
+**现象**：还原 1.35GB 的 7z 文件时，还原出的文件无法解压。排查发现 `mHexString` 只有 2.147GB，远小于文件所需的 2.716GB。
+
+**根因**：`AppUtil::GetFileDrawHexString` 中使用 `std::ostringstream` 拼接文件十六进制字符串和协议头时，MSVC 的 `stringbuf` 内部缓冲区扩容上限硬编码为 `INT_MAX`（2,147,483,647）。当拼接数据超过此值时，后续数据被静默丢弃。
+
+**关键代码**（MSVC `sstream` 源码）：
+```cpp
+// stringbuf::overflow 中的扩容逻辑
+if (_Oldsize < INT_MAX / 2) {
+    _Newsize = _Oldsize << 1;      // 小于1GB时翻倍扩容
+} else if (_Oldsize < INT_MAX) {
+    _Newsize = INT_MAX;            // 超过1GB时上限锁定为INT_MAX
+}
+```
+
+**后果**：
+- 小于 1GB 的文件（hex < 2GB）正常工作
+- 大于 1GB 的文件（hex > 2GB）被截断，且无任何错误提示
+- `mTotalPage` 基于截断后的数据计算，页数偏少
+- 截断点正好在 `INT_MAX`（2,147,483,647），排查时极易被误认为是 32 位 int 溢出
+
+**修复**：将 `ostringstream` 替换为 `std::string` 直接拼接。
+```cpp
+// 旧代码（有截断风险）：
+std::ostringstream oss;
+oss << nameLenHex << totalPageHex << fileNameHexStr << contentLenHex << fileHexStr;
+std::string result = oss.str();
+
+// 新代码（安全）：
+std::string result = nameLenHex + totalPageHex + fileNameHexStr + contentLenHex;
+result += fileHexStr;
+```
+
+**教训**：
+- 不要假设标准库组件没有隐藏限制，`ostringstream` 的简洁是以隐藏风险为代价的
+- 处理可能超过 GB 级的数据时，优先用 `std::string` 直接拼接
+- 小数据测试通过不代表大数据也正常，边界测试很重要
+- 有疑点时写最小复现代码验证，比翻源码或猜测更高效
+- 关键操作在关键节点记录数据量日志，便于排查
