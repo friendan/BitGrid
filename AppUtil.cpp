@@ -217,6 +217,46 @@ bool AppUtil::WriteHexStringToFile(const std::string& hexStr, const std::wstring
     return AppUtil::WriteHexStringToFile(hexStr, WStrToStr(wstrFilePath));
 }
 
+bool AppUtil::WriteHexStringToFileW(const std::string& hexStr, const std::wstring& wstrFilePath)
+{
+    if (hexStr.empty()) {
+        return false;
+    }
+
+    std::string normalizedHex = hexStr;
+    if (normalizedHex.size() % 2 != 0) {
+        normalizedHex = hexStr.substr(0, hexStr.size() - 1);
+        SaveLog("[WriteHexStringToFileW] Truncated odd-length hex string: ",
+                std::to_string(hexStr.size()), " -> ", std::to_string(normalizedHex.size()));
+    }
+
+    // 使用宽字符路径直接打开文件
+    std::ofstream file(wstrFilePath, std::ios::binary);
+    if (!file.is_open()) {
+        return false;
+    }
+
+    const size_t byteCount = normalizedHex.size() / 2;
+    std::string binaryData;
+    binaryData.reserve(byteCount);
+
+    auto CharToHex = [](char c) -> uint8_t {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
+        if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+        return 0xFF;
+    };
+
+    for (size_t i = 0; i < normalizedHex.size(); i += 2) {
+        uint8_t high = CharToHex(normalizedHex[i]);
+        uint8_t low = CharToHex(normalizedHex[i + 1]);
+        binaryData += (high << 4) | low;
+    }
+
+    file.write(binaryData.data(), std::streamsize(binaryData.size()));
+    return true;
+}
+
 std::string AppUtil::GetSubStrByPage(const std::string& str, size_t pageSize, size_t pageNum){
     if(str.empty() || pageSize < 1 || pageNum < 1){
         return "";

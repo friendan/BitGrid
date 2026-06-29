@@ -74,6 +74,8 @@ public:
      */
     static bool WriteHexStringToFile(const std::string& hexStr, const std::string& strFilePath);
     static bool WriteHexStringToFile(const std::string& hexStr, const std::wstring& wstrFilePath);
+    // 使用宽字符路径直接写入，避免 UTF-8 转 ANSI 导致中文路径乱码
+    static bool WriteHexStringToFileW(const std::string& hexStr, const std::wstring& wstrFilePath);
 
     /**
      * @brief 按分页方式获取子字符串
