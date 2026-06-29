@@ -64,6 +64,15 @@ std::wstring AppUtil::StrToWStr(const std::string& str){
     return result;
 }
 
+std::wstring AppUtil::AnsiToWStr(const std::string& str){
+	if (str.empty()) return {};
+    int len = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, nullptr, 0);
+    std::wstring result(len, 0);
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, &result[0], len);
+    if (!result.empty()) result.pop_back();
+    return result;
+}
+
 std::string AppUtil::ReadFileToHexString(const std::string& path)
 {
     std::ifstream file(path, std::ios::binary);

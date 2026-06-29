@@ -39,6 +39,7 @@ public:
 
 	static std::string WStrToStr(const std::wstring& wstr);
 	static std::wstring StrToWStr(const std::string& str);
+	static std::wstring AnsiToWStr(const std::string& str);
 
 	/**
 	 * @brief 读取文件的二进制内容，并转换为十六进制字符串
