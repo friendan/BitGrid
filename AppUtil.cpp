@@ -392,14 +392,22 @@ std::string AppUtil::GetFileDrawHexString(HWND hParent){
     // 新格式：文件名长度(8) + 总页数(4) + 文件名(512) + 内容长度(8) + 内容
     std::string totalPageHex = AppUtil::UInt16ToHexStr(1);  // 默认总页数为1
     
-    std::ostringstream oss;
-    oss << nameLenHex << totalPageHex << fileNameHexStr << contentLenHex << fileHexStr;
+    // std::ostringstream oss;
+    // oss << nameLenHex << totalPageHex << fileNameHexStr << contentLenHex << fileHexStr;
+    // return oss.str(); // 不能这样，有上限2G的限制，超过2G后的数据就丢了
 
-    // AppUtil::SaveLog("[GetFileDrawHexString] fileName=", fileName, 
+
+    // 直接拼接字符串，避免ostringstream对超过 INT_MAX 数据的内部截断
+    std::string result = nameLenHex + totalPageHex + fileNameHexStr + contentLenHex;
+    result += fileHexStr;
+
+    // AppUtil::SaveLog("[GetFileDrawHexString] fileName=", fileName,
+    //                  " fileSize=", std::to_string(AppUtil::DrawFileSize),
     //                  " contentLength=", std::to_string(contentLength),
-    //                  " totalHexSize=", std::to_string(oss.str().size()));
+    //                  " fileHexStr=", std::to_string(fileHexStr.size()),
+    //                  " totalHexSize=", std::to_string(result.size()));
 
-    return oss.str();
+    return result;
 }
 
  std::string AppUtil::StringToLen256(const std::string& str){
